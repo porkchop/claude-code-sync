@@ -1,0 +1,56 @@
+#!/bin/bash
+# Claude Code Backup List
+# Lists all available backups with details
+
+# Save original directory to return to it at the end
+ORIGINAL_DIR="$(pwd)"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load configuration
+source "$SCRIPT_DIR/lib-claude-sync.sh"
+load_config "$SCRIPT_DIR"
+
+BACKUP_DIR="$SCRIPT_DIR/backups"
+
+echo "=== Claude Code Backups ==="
+echo ""
+
+if [ ! -d "$BACKUP_DIR" ] || [ -z "$(ls -A "$BACKUP_DIR"/*.tar.gz 2>/dev/null)" ]; then
+    echo "No backups found."
+    echo ""
+    echo "To create a backup, run: claude-backup"
+    cd "$ORIGINAL_DIR"
+    exit 0
+fi
+
+echo "Available backups (newest first):"
+echo ""
+
+printf "%-30s %-10s %-20s\n" "BACKUP NAME" "SIZE" "MACHINE"
+printf "%-30s %-10s %-20s\n" "----------" "----" "-------"
+
+ls -1t "$BACKUP_DIR"/*.tar.gz | while read backup; do
+    BASENAME=$(basename "$backup" .tar.gz)
+    SIZE=$(du -h "$backup" | cut -f1)
+
+    # Extract machine name (after second dash)
+    MACHINE=$(echo "$BASENAME" | cut -d'-' -f3)
+
+    printf "%-30s %-10s %-20s\n" "$BASENAME" "$SIZE" "$MACHINE"
+done
+
+echo ""
+BACKUP_COUNT=$(ls -1 "$BACKUP_DIR"/*.tar.gz 2>/dev/null | wc -l)
+TOTAL_SIZE=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1)
+echo "Total: $BACKUP_COUNT backups using $TOTAL_SIZE"
+
+# Show retention policy
+echo "Retention: $CLAUDE_BACKUP_RETENTION_DAYS days (configure in .claude-sync-config.local)"
+
+echo ""
+echo "To restore a backup: claude-restore <backup-name>"
+echo "To create a backup:  claude-backup"
+
+# Return to original directory
+cd "$ORIGINAL_DIR"

@@ -1,0 +1,116 @@
+#!/bin/bash
+# Claude Code Conversation Restore
+# Restores a backup of ~/.claude data
+
+set -e
+
+# Save original directory to return to it at the end
+ORIGINAL_DIR="$(pwd)"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load configuration
+source "$SCRIPT_DIR/lib-claude-sync.sh"
+load_config "$SCRIPT_DIR"
+
+CLAUDE_DIR="$CLAUDE_DATA_DIR"
+BACKUP_DIR="$SCRIPT_DIR/backups"
+
+echo "=== Claude Code Restore ==="
+echo ""
+
+# Check if backup name provided
+if [ -z "$1" ]; then
+    echo "Usage: claude-restore <backup-name>"
+    echo ""
+    echo "Available backups:"
+    echo ""
+
+    if [ -d "$BACKUP_DIR" ] && [ "$(ls -A "$BACKUP_DIR"/*.tar.gz 2>/dev/null)" ]; then
+        ls -1t "$BACKUP_DIR"/*.tar.gz | while read backup; do
+            BASENAME=$(basename "$backup" .tar.gz)
+            SIZE=$(du -h "$backup" | cut -f1)
+            echo "  $BASENAME (${SIZE})"
+        done
+    else
+        echo "  No backups found in $BACKUP_DIR"
+    fi
+    echo ""
+    echo "Example: claude-restore 20231229-143022-moon"
+    cd "$ORIGINAL_DIR"
+    exit 1
+fi
+
+BACKUP_NAME="$1"
+BACKUP_PATH="$BACKUP_DIR/${BACKUP_NAME}.tar.gz"
+
+# Check if backup exists
+if [ ! -f "$BACKUP_PATH" ]; then
+    echo "Error: Backup not found: $BACKUP_PATH"
+    echo ""
+    echo "Available backups:"
+    ls -1t "$BACKUP_DIR"/*.tar.gz 2>/dev/null | while read backup; do
+        echo "  $(basename "$backup" .tar.gz)"
+    done
+    cd "$ORIGINAL_DIR"
+    exit 1
+fi
+
+echo "WARNING: This will replace your current $CLAUDE_DIR directory!"
+echo ""
+echo "Backup to restore: $BACKUP_NAME"
+echo "Backup file: $BACKUP_PATH"
+echo "Size: $(du -h "$BACKUP_PATH" | cut -f1)"
+echo ""
+echo "Current $CLAUDE_DIR will be backed up first as a safety measure."
+echo ""
+read -p "Continue? (yes/no): " CONFIRM
+
+if [ "$CONFIRM" != "yes" ]; then
+    echo "Restore cancelled."
+    cd "$ORIGINAL_DIR"
+    exit 0
+fi
+
+# Create safety backup of current state
+if [ -d "$CLAUDE_DIR" ]; then
+    SAFETY_BACKUP="$BACKUP_DIR/pre-restore-$(date '+%Y%m%d-%H%M%S')-$(hostname)"
+    echo ""
+    echo "Creating safety backup of current state..."
+    tar -czf "$SAFETY_BACKUP.tar.gz" \
+        -C "$(dirname "$CLAUDE_DIR")" \
+        --exclude="$(basename "$CLAUDE_DIR")/.credentials.json" \
+        "$(basename "$CLAUDE_DIR")" 2>/dev/null || true
+    echo "Safety backup: $SAFETY_BACKUP.tar.gz"
+fi
+
+echo ""
+echo "Restoring backup..."
+
+# Remove current .claude (except credentials)
+if [ -d "$CLAUDE_DIR" ]; then
+    # Save credentials if they exist
+    if [ -f "$CLAUDE_DIR/.credentials.json" ]; then
+        cp "$CLAUDE_DIR/.credentials.json" "/tmp/.claude-credentials-backup.json"
+        CREDS_SAVED=1
+    fi
+
+    # Remove old data
+    rm -rf "$CLAUDE_DIR"
+fi
+
+# Extract backup
+tar -xzf "$BACKUP_PATH" -C "$(dirname "$CLAUDE_DIR")"
+
+# Restore credentials if they were saved
+if [ "$CREDS_SAVED" = "1" ]; then
+    mv "/tmp/.claude-credentials-backup.json" "$CLAUDE_DIR/.credentials.json"
+fi
+
+echo ""
+echo "Restore complete!"
+echo ""
+echo "You may need to restart Claude Code to see the restored conversations."
+
+# Return to original directory
+cd "$ORIGINAL_DIR"

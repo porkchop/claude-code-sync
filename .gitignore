@@ -1,0 +1,25 @@
+# Claude credentials (NEVER commit these)
+.credentials.json
+*.credentials.json
+
+# Local configuration (machine-specific, not synced)
+.claude-sync-config.local
+
+# Synced conversations directory (created during usage)
+conversations/
+
+# Backups (local only, not synced)
+backups/
+
+# Temporary files
+*.swp
+*.tmp
+*.bak
+*~
+
+# Claude local settings
+.claude/
+
+# OS files
+.DS_Store
+Thumbs.db

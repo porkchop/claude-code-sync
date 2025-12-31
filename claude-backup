@@ -1,0 +1,88 @@
+#!/bin/bash
+# Claude Code Conversation Backup
+# Creates a timestamped backup of ~/.claude data
+
+set -e
+
+# Save original directory to return to it at the end
+ORIGINAL_DIR="$(pwd)"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load configuration
+source "$SCRIPT_DIR/lib-claude-sync.sh"
+load_config "$SCRIPT_DIR"
+
+CLAUDE_DIR="$CLAUDE_DATA_DIR"
+BACKUP_DIR="$SCRIPT_DIR/backups"
+TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
+HOSTNAME=$(hostname)
+BACKUP_NAME="${TIMESTAMP}-${HOSTNAME}"
+BACKUP_PATH="$BACKUP_DIR/$BACKUP_NAME"
+
+echo "=== Claude Code Backup ==="
+echo ""
+
+# Check if Claude directory exists
+if [ ! -d "$CLAUDE_DIR" ]; then
+    echo "Error: $CLAUDE_DIR does not exist."
+    echo "Claude Code may not have been used yet on this machine."
+    cd "$ORIGINAL_DIR"
+    exit 1
+fi
+
+# Create backup directory
+mkdir -p "$BACKUP_DIR"
+
+echo "Creating backup: $BACKUP_NAME"
+echo "Source: $CLAUDE_DIR"
+echo "Destination: $BACKUP_PATH"
+echo ""
+
+# Create backup using tar for better compression and integrity
+tar -czf "$BACKUP_PATH.tar.gz" \
+    -C "$(dirname "$CLAUDE_DIR")" \
+    --exclude='$(basename "$CLAUDE_DIR")/.credentials.json' \
+    --exclude='$(basename "$CLAUDE_DIR")/debug' \
+    --exclude='$(basename "$CLAUDE_DIR")/statsig' \
+    "$(basename "$CLAUDE_DIR")"
+
+echo "Backup created successfully!"
+echo ""
+echo "Backup file: $BACKUP_PATH.tar.gz"
+echo "Size: $(du -h "$BACKUP_PATH.tar.gz" | cut -f1)"
+echo ""
+
+# Show number of backups
+BACKUP_COUNT=$(ls -1 "$BACKUP_DIR"/*.tar.gz 2>/dev/null | wc -l)
+echo "Total backups: $BACKUP_COUNT"
+
+# Check retention policy
+RETENTION_DAYS="$CLAUDE_BACKUP_RETENTION_DAYS"
+if [ "$BACKUP_COUNT" -gt 20 ] || [ -n "$RETENTION_DAYS" ]; then
+    echo ""
+    echo "Retention policy: Keep backups for $RETENTION_DAYS days"
+
+    # Auto-cleanup old backups based on retention
+    if [ -n "$RETENTION_DAYS" ] && [ "$RETENTION_DAYS" -gt 0 ]; then
+        OLD_BACKUPS=$(find "$BACKUP_DIR" -name "*.tar.gz" -type f -mtime +"$RETENTION_DAYS" 2>/dev/null)
+        if [ -n "$OLD_BACKUPS" ]; then
+            echo "Cleaning up backups older than $RETENTION_DAYS days..."
+            echo "$OLD_BACKUPS" | while read old_backup; do
+                echo "  Removing: $(basename "$old_backup")"
+                rm "$old_backup"
+            done
+        fi
+    elif [ "$BACKUP_COUNT" -gt 20 ]; then
+        echo "Warning: You have $BACKUP_COUNT backups. Consider cleaning old ones:"
+        echo "  ls -lth $BACKUP_DIR/"
+        echo "  rm $BACKUP_DIR/<old-backup>.tar.gz"
+    fi
+fi
+
+echo ""
+echo "To restore this backup later, run:"
+echo "  claude-restore $BACKUP_NAME"
+
+# Return to original directory
+cd "$ORIGINAL_DIR"

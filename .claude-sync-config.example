@@ -1,0 +1,34 @@
+# Claude Code Conversation Sync - Configuration
+#
+# Copy this file to .claude-sync-config.local and customize for your setup.
+# The .local file is gitignored and won't be synced to your repo.
+#
+# Environment variables (CLAUDE_SYNC_*) will override these settings.
+
+# Git remote URL for syncing conversations
+# Examples:
+#   CLAUDE_SYNC_REMOTE="git@bitbucket.org:username/claude-sync.git"
+#   CLAUDE_SYNC_REMOTE="git@github.com:username/claude-sync.git"
+#   CLAUDE_SYNC_REMOTE="https://github.com/username/claude-sync.git"
+CLAUDE_SYNC_REMOTE=""
+
+# Git branch to use (default: main)
+CLAUDE_SYNC_BRANCH="main"
+
+# Enable encryption (requires git-crypt)
+# Set to "true" to enable, "false" to disable
+CLAUDE_SYNC_ENCRYPTION="false"
+
+# Backup retention - how many days to keep backups
+CLAUDE_BACKUP_RETENTION_DAYS="30"
+
+# Claude data directory (usually ~/.claude)
+# Only change this if you have a non-standard installation
+CLAUDE_DATA_DIR="$HOME/.claude"
+
+# Verbose output (true/false)
+CLAUDE_SYNC_VERBOSE="false"
+
+# Auto-commit message template
+# Available variables: {date}, {time}, {hostname}
+CLAUDE_SYNC_COMMIT_MSG="Sync conversations - {date} {time} - {hostname}"

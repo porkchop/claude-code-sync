@@ -1,0 +1,93 @@
+#!/bin/bash
+# Claude Code Sync - Configuration Helper
+# Creates and manages configuration
+
+set -e
+
+ORIGINAL_DIR="$(pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+EXAMPLE_CONFIG="$SCRIPT_DIR/.claude-sync-config.example"
+LOCAL_CONFIG="$SCRIPT_DIR/.claude-sync-config.local"
+SHARED_CONFIG="$SCRIPT_DIR/.claude-sync-config"
+
+echo "=== Claude Code Sync - Configuration ==="
+echo ""
+
+# Check if local config exists
+if [ -f "$LOCAL_CONFIG" ]; then
+    echo "Current configuration: $LOCAL_CONFIG"
+    echo ""
+    cat "$LOCAL_CONFIG"
+    echo ""
+    read -p "Edit configuration? (yes/no): " EDIT
+    if [ "$EDIT" = "yes" ]; then
+        ${EDITOR:-nano} "$LOCAL_CONFIG"
+        echo "Configuration updated!"
+    fi
+else
+    echo "No local configuration found."
+    echo ""
+    echo "Would you like to create one now?"
+    echo ""
+    read -p "Create configuration? (yes/no): " CREATE
+
+    if [ "$CREATE" = "yes" ]; then
+        echo ""
+        echo "Configuration wizard:"
+        echo ""
+
+        # Git remote
+        read -p "Git remote URL (e.g., git@bitbucket.org:user/repo.git): " REMOTE
+
+        # Branch
+        read -p "Git branch [main]: " BRANCH
+        BRANCH=${BRANCH:-main}
+
+        # Encryption
+        read -p "Enable encryption? (yes/no) [no]: " ENCRYPT
+        if [ "$ENCRYPT" = "yes" ]; then
+            ENCRYPTION="true"
+        else
+            ENCRYPTION="false"
+        fi
+
+        # Create config file
+        cat > "$LOCAL_CONFIG" <<EOF
+# Claude Code Conversation Sync - Local Configuration
+# This file is gitignored and machine-specific
+
+CLAUDE_SYNC_REMOTE="$REMOTE"
+CLAUDE_SYNC_BRANCH="$BRANCH"
+CLAUDE_SYNC_ENCRYPTION="$ENCRYPTION"
+CLAUDE_BACKUP_RETENTION_DAYS="30"
+CLAUDE_DATA_DIR="\$HOME/.claude"
+CLAUDE_SYNC_VERBOSE="false"
+EOF
+
+        echo ""
+        echo "Configuration created at: $LOCAL_CONFIG"
+        echo ""
+        echo "You can edit it anytime by running: claude-config"
+    else
+        echo ""
+        echo "To create configuration later, run: claude-config"
+        echo ""
+        echo "Or manually copy:"
+        echo "  cp $EXAMPLE_CONFIG $LOCAL_CONFIG"
+        echo "  edit $LOCAL_CONFIG"
+    fi
+fi
+
+echo ""
+echo "Configuration priority (highest to lowest):"
+echo "  1. Environment variables (CLAUDE_SYNC_*)"
+echo "  2. Local config: .claude-sync-config.local (machine-specific)"
+echo "  3. Shared config: .claude-sync-config (version controlled)"
+echo "  4. Built-in defaults"
+echo ""
+echo "To set environment variables, add to your ~/.bashrc:"
+echo "  export CLAUDE_SYNC_REMOTE=\"git@bitbucket.org:user/repo.git\""
+echo ""
+
+cd "$ORIGINAL_DIR"

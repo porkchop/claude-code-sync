@@ -1,0 +1,86 @@
+#!/bin/bash
+# Claude Code Conversation Sync - Status
+# Shows sync status and helpful information
+
+# Save original directory to return to it at the end
+ORIGINAL_DIR="$(pwd)"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load configuration
+source "$SCRIPT_DIR/lib-claude-sync.sh"
+load_config "$SCRIPT_DIR"
+
+CLAUDE_DIR="$CLAUDE_DATA_DIR"
+REPO_DIR="$SCRIPT_DIR/conversations"
+
+echo "=== Claude Code Conversation Sync - Status ==="
+echo ""
+echo "Local machine: $(hostname)"
+echo "Claude data directory: $CLAUDE_DIR"
+echo "Sync repository: $SCRIPT_DIR"
+echo ""
+
+# Show current configuration
+show_config
+echo ""
+
+# Check if git is initialized
+if [ -d "$SCRIPT_DIR/.git" ]; then
+    echo "Git repository: Initialized"
+
+    # Check for remote
+    cd "$SCRIPT_DIR"
+    if git remote | grep -q origin; then
+        echo "Remote URL: $(git remote get-url origin)"
+        echo "Current branch: $(git branch --show-current)"
+    else
+        echo "Remote: Not configured"
+        echo ""
+        echo "To configure:"
+        echo "  claude-config"
+    fi
+
+    # Show git status
+    echo ""
+    if [ -z "$(git status --porcelain)" ]; then
+        echo "Working tree: Clean (no changes to push)"
+    else
+        echo "Working tree: Has changes"
+        echo ""
+        echo "Changed files:"
+        git status --short
+        echo ""
+        echo "Run 'claude-sync-push' to sync these changes."
+    fi
+else
+    echo "Git repository: Not initialized"
+    echo "Run 'claude-config' to set up, then 'claude-sync-push' to initialize."
+fi
+
+echo ""
+
+# Show conversation count
+if [ -d "$CLAUDE_DIR/projects" ]; then
+    PROJECT_COUNT=$(find "$CLAUDE_DIR/projects" -name "*.jsonl" 2>/dev/null | wc -l)
+    echo "Local conversations: $PROJECT_COUNT"
+else
+    echo "Local conversations: 0 (Claude Code not used yet)"
+fi
+
+if [ -d "$REPO_DIR/projects" ]; then
+    SYNCED_COUNT=$(find "$REPO_DIR/projects" -name "*.jsonl" 2>/dev/null | wc -l)
+    echo "Synced conversations: $SYNCED_COUNT"
+else
+    echo "Synced conversations: 0"
+fi
+
+echo ""
+echo "Commands:"
+echo "  claude-config      - Configure sync settings"
+echo "  claude-sync-push   - Sync local conversations to remote"
+echo "  claude-sync-pull   - Sync conversations from remote to local"
+echo "  claude-sync-status - Show this status"
+
+# Return to original directory
+cd "$ORIGINAL_DIR"

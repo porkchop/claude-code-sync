@@ -1,0 +1,144 @@
+#!/bin/bash
+# Enable encryption for Claude Code conversations using git-crypt
+
+set -e
+
+# Save original directory
+ORIGINAL_DIR="$(pwd)"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+KEY_PATH="$HOME/.claude-git-crypt.key"
+
+echo "=== Claude Code Conversation Encryption Setup ==="
+echo ""
+echo "This will enable transparent encryption for your synced conversations."
+echo "Files will be encrypted on Bitbucket, decrypted automatically on your machines."
+echo ""
+
+# Check if git-crypt is installed
+if ! command -v git-crypt &> /dev/null; then
+    echo "Error: git-crypt is not installed."
+    echo ""
+    echo "Install it with:"
+    echo "  sudo apt install git-crypt     (Ubuntu/PopOS)"
+    echo "  brew install git-crypt         (macOS)"
+    echo ""
+    cd "$ORIGINAL_DIR"
+    exit 1
+fi
+
+cd "$SCRIPT_DIR"
+
+# Check if git is initialized
+if [ ! -d ".git" ]; then
+    echo "Error: Git repository not initialized."
+    echo "Run 'claude-sync-push' first to initialize the repository."
+    cd "$ORIGINAL_DIR"
+    exit 1
+fi
+
+# Check if git-crypt is already initialized
+if [ -d ".git/git-crypt" ]; then
+    echo "Git-crypt is already initialized for this repository."
+    echo ""
+
+    # Check if we're currently unlocked
+    if git-crypt status &>/dev/null; then
+        echo "Status: Repository is unlocked (encryption active)"
+    else
+        echo "Status: Repository is locked (need to unlock)"
+        echo ""
+        echo "To unlock on this machine:"
+        echo "  git-crypt unlock $KEY_PATH"
+    fi
+
+    cd "$ORIGINAL_DIR"
+    exit 0
+fi
+
+# Warn about existing conversations
+if [ -d "conversations" ] && [ "$(find conversations -type f | wc -l)" -gt 0 ]; then
+    echo "WARNING: You have existing unencrypted conversations."
+    echo ""
+    echo "After enabling encryption:"
+    echo "  1. Existing files will be encrypted on next commit"
+    echo "  2. Old commits in git history will still be unencrypted"
+    echo "  3. Consider creating a fresh repository if you want full encryption"
+    echo ""
+    read -p "Continue anyway? (yes/no): " CONFIRM
+    if [ "$CONFIRM" != "yes" ]; then
+        echo "Encryption setup cancelled."
+        cd "$ORIGINAL_DIR"
+        exit 0
+    fi
+fi
+
+echo ""
+echo "Initializing git-crypt..."
+git-crypt init
+
+echo "Configuring encryption for conversations directory..."
+cat > .gitattributes <<EOF
+# Encrypt all conversation data
+conversations/** filter=git-crypt diff=git-crypt
+EOF
+
+git add .gitattributes
+
+echo ""
+echo "Exporting encryption key to: $KEY_PATH"
+git-crypt export-key "$KEY_PATH"
+chmod 600 "$KEY_PATH"
+
+echo ""
+echo "Committing git-crypt configuration..."
+git commit -m "Enable git-crypt encryption for conversations"
+
+echo ""
+echo "=== Encryption Enabled Successfully! ==="
+echo ""
+echo "Your encryption key has been saved to: $KEY_PATH"
+echo ""
+
+# Create base64 encoded version for easy KeePass storage
+KEY_BASE64="$KEY_PATH.base64"
+base64 "$KEY_PATH" > "$KEY_BASE64"
+
+echo "IMPORTANT - Back up your encryption key to KeePass NOW!"
+echo ""
+echo "Option 1: Store as KeePass attachment (recommended)"
+echo "  1. Open KeePass and create a new entry: 'Claude Code Git-Crypt Key'"
+echo "  2. Add attachment: $KEY_PATH"
+echo "  3. Save the entry"
+echo ""
+echo "Option 2: Store as text in KeePass notes"
+echo "  1. Open KeePass and create a new entry: 'Claude Code Git-Crypt Key'"
+echo "  2. Copy the base64 key below and paste into Notes field:"
+echo ""
+echo "--- BEGIN BASE64 KEY (copy everything between the lines) ---"
+cat "$KEY_BASE64"
+echo "--- END BASE64 KEY ---"
+echo ""
+echo "To restore from base64 later, run:"
+echo "  echo '<paste-key-here>' | base64 -d > ~/.claude-git-crypt.key"
+echo ""
+echo "WARNING: Without this key, you CANNOT decrypt your conversations!"
+echo "         Make sure it's saved in KeePass before proceeding."
+echo ""
+read -p "Have you saved the key to KeePass? (yes/no): " SAVED
+
+if [ "$SAVED" != "yes" ]; then
+    echo ""
+    echo "Please save the key to KeePass before continuing."
+    echo "The base64 key is also saved at: $KEY_BASE64"
+    echo ""
+fi
+
+echo ""
+echo "Next steps:"
+echo "  1. Run 'claude-sync-push' to sync the encrypted configuration"
+echo "  2. On other machines, retrieve key from KeePass and save to ~/.claude-git-crypt.key"
+echo "  3. Run 'git-crypt unlock ~/.claude-git-crypt.key' on each machine"
+echo ""
+
+cd "$ORIGINAL_DIR"

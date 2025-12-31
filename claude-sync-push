@@ -1,0 +1,119 @@
+#!/bin/bash
+# Claude Code Conversation Sync - Push to Bitbucket
+# Syncs conversations from ~/.claude to this repo and pushes to Bitbucket
+
+set -e
+
+# Save original directory to return to it at the end
+ORIGINAL_DIR="$(pwd)"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load configuration
+source "$SCRIPT_DIR/lib-claude-sync.sh"
+load_config "$SCRIPT_DIR"
+
+CLAUDE_DIR="$CLAUDE_DATA_DIR"
+REPO_DIR="$SCRIPT_DIR/conversations"
+
+echo "=== Claude Code Conversation Sync - Push ==="
+echo "Syncing from: $CLAUDE_DIR"
+echo "Syncing to: $REPO_DIR"
+echo ""
+
+# Validate configuration
+if ! validate_config; then
+    cd "$ORIGINAL_DIR"
+    exit 1
+fi
+
+log_verbose "Using remote: $CLAUDE_SYNC_REMOTE"
+log_verbose "Using branch: $CLAUDE_SYNC_BRANCH"
+
+# Pull latest from git first (if repo exists)
+cd "$SCRIPT_DIR"
+if [ -d ".git" ] && git remote | grep -q origin 2>/dev/null; then
+    echo "Pulling latest conversations from remote..."
+    git pull origin "$CLAUDE_SYNC_BRANCH" 2>/dev/null || {
+        echo "Note: Could not pull. Continuing with local merge..."
+    }
+    echo ""
+fi
+
+# Create directory structure
+mkdir -p "$REPO_DIR/projects"
+mkdir -p "$REPO_DIR/file-history"
+mkdir -p "$REPO_DIR/todos"
+
+# Sync projects (conversations) - MERGE, don't delete
+echo "Merging local conversations into repo..."
+rsync -av --update "$CLAUDE_DIR/projects/" "$REPO_DIR/projects/"
+
+# Sync file-history - MERGE, don't delete
+echo "Merging file history..."
+rsync -av --update "$CLAUDE_DIR/file-history/" "$REPO_DIR/file-history/"
+
+# Sync todos - MERGE, don't delete
+echo "Merging todos..."
+rsync -av --update "$CLAUDE_DIR/todos/" "$REPO_DIR/todos/"
+
+# Sync global history (without credentials)
+echo "Syncing global history..."
+if [ -f "$CLAUDE_DIR/history.jsonl" ]; then
+    cp "$CLAUDE_DIR/history.jsonl" "$REPO_DIR/history.jsonl"
+fi
+
+# Git operations
+cd "$SCRIPT_DIR"
+
+# Initialize git if not already done
+if [ ! -d ".git" ]; then
+    echo "Initializing git repository..."
+    git init
+    git branch -M "$CLAUDE_SYNC_BRANCH"
+fi
+
+# Set remote if configured and not already set
+if [ -n "$CLAUDE_SYNC_REMOTE" ] && ! git remote | grep -q origin; then
+    echo "Adding git remote: $CLAUDE_SYNC_REMOTE"
+    git remote add origin "$CLAUDE_SYNC_REMOTE"
+fi
+
+# Check if there are changes
+if [ -z "$(git status --porcelain)" ]; then
+    echo ""
+    echo "No changes to sync."
+    cd "$ORIGINAL_DIR"
+    exit 0
+fi
+
+echo ""
+echo "Changes detected. Committing..."
+git add conversations/
+
+# Use configured commit message template
+COMMIT_MSG="${CLAUDE_SYNC_COMMIT_MSG}"
+COMMIT_MSG="${COMMIT_MSG//\{date\}/$(date '+%Y-%m-%d')}"
+COMMIT_MSG="${COMMIT_MSG//\{time\}/$(date '+%H:%M:%S')}"
+COMMIT_MSG="${COMMIT_MSG//\{hostname\}/$(hostname)}"
+
+git commit -m "$COMMIT_MSG"
+
+# Push if remote exists
+if git remote | grep -q origin; then
+    echo "Pushing to remote..."
+    git push origin "$CLAUDE_SYNC_BRANCH" || {
+        echo "Warning: Could not push. You may need to set up the remote first:"
+        echo "  git remote add origin $CLAUDE_SYNC_REMOTE"
+        echo "  git push -u origin $CLAUDE_SYNC_BRANCH"
+    }
+else
+    echo ""
+    echo "No git remote configured. Run 'claude-config' to set it up."
+fi
+
+echo ""
+echo "Sync complete!"
+
+# Return to original directory
+cd "$ORIGINAL_DIR"

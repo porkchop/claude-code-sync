@@ -1,0 +1,28 @@
+# Claude Code Conversation Sync - Shared Configuration
+#
+# This file contains default configuration shared across all machines.
+# For machine-specific settings, create .claude-sync-config.local (gitignored).
+#
+# Environment variables (CLAUDE_SYNC_*) will override these settings.
+
+# Git branch to use (default: main)
+CLAUDE_SYNC_BRANCH="main"
+
+# Enable encryption (requires git-crypt)
+# Set to "true" to enable, "false" to disable
+CLAUDE_SYNC_ENCRYPTION="false"
+
+# Backup retention - how many days to keep backups
+CLAUDE_BACKUP_RETENTION_DAYS="30"
+
+# Claude data directory (usually ~/.claude)
+CLAUDE_DATA_DIR="$HOME/.claude"
+
+# Verbose output (true/false)
+CLAUDE_SYNC_VERBOSE="false"
+
+# Git remote URL - CONFIGURE THIS in .claude-sync-config.local
+# Examples:
+#   CLAUDE_SYNC_REMOTE="git@bitbucket.org:username/claude-sync.git"
+#   CLAUDE_SYNC_REMOTE="git@github.com:username/claude-sync.git"
+CLAUDE_SYNC_REMOTE=""

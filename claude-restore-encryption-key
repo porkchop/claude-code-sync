@@ -1,0 +1,93 @@
+#!/bin/bash
+# Restore git-crypt key from KeePass backup
+
+set -e
+
+# Save original directory
+ORIGINAL_DIR="$(pwd)"
+
+KEY_PATH="$HOME/.claude-git-crypt.key"
+
+echo "=== Restore Git-Crypt Key from KeePass ==="
+echo ""
+echo "This will help you restore your encryption key from KeePass."
+echo ""
+
+# Check if key already exists
+if [ -f "$KEY_PATH" ]; then
+    echo "Warning: Encryption key already exists at $KEY_PATH"
+    echo ""
+    read -p "Overwrite it? (yes/no): " CONFIRM
+    if [ "$CONFIRM" != "yes" ]; then
+        echo "Cancelled."
+        cd "$ORIGINAL_DIR"
+        exit 0
+    fi
+fi
+
+echo "Choose restore method:"
+echo ""
+echo "1) From KeePass attachment (saved the binary .key file)"
+echo "2) From base64 text (copied from KeePass notes)"
+echo ""
+read -p "Enter choice (1 or 2): " CHOICE
+
+case "$CHOICE" in
+    1)
+        echo ""
+        echo "Steps to restore from KeePass attachment:"
+        echo "  1. Open KeePass and find 'Claude Code Git-Crypt Key' entry"
+        echo "  2. Right-click the attachment (.key file)"
+        echo "  3. Save it to: $KEY_PATH"
+        echo ""
+        echo "After saving the file, press Enter to continue..."
+        read
+
+        if [ -f "$KEY_PATH" ]; then
+            chmod 600 "$KEY_PATH"
+            echo "Key restored successfully!"
+        else
+            echo "Error: Key file not found at $KEY_PATH"
+            echo "Make sure you saved it to the correct location."
+            cd "$ORIGINAL_DIR"
+            exit 1
+        fi
+        ;;
+
+    2)
+        echo ""
+        echo "Paste the base64 key from KeePass (then press Ctrl+D):"
+        echo ""
+
+        # Read multiline input
+        base64 -d > "$KEY_PATH"
+
+        if [ $? -eq 0 ] && [ -f "$KEY_PATH" ]; then
+            chmod 600 "$KEY_PATH"
+            echo ""
+            echo "Key restored successfully!"
+        else
+            echo ""
+            echo "Error: Failed to decode base64 key."
+            echo "Make sure you copied the entire key including no extra whitespace."
+            cd "$ORIGINAL_DIR"
+            exit 1
+        fi
+        ;;
+
+    *)
+        echo "Invalid choice."
+        cd "$ORIGINAL_DIR"
+        exit 1
+        ;;
+esac
+
+echo ""
+echo "Key saved to: $KEY_PATH"
+echo ""
+echo "Now you can unlock the repository:"
+echo "  cd ~/dev/projects/aaron/claude"
+echo "  git-crypt unlock $KEY_PATH"
+echo ""
+
+cd "$ORIGINAL_DIR"
