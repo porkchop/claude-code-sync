@@ -23,22 +23,29 @@ echo ""
 
 log_verbose "Using branch: $CLAUDE_SYNC_BRANCH"
 
-# Pull from git if remote exists
-cd "$SCRIPT_DIR"
-if [ -d ".git" ] && git remote | grep -q origin; then
-    echo "Pulling from remote..."
-    git pull origin "$CLAUDE_SYNC_BRANCH" 2>/dev/null || {
-        echo "Warning: Could not pull. Using local copy."
-    }
-else
-    echo "No git remote configured or not a git repo. Using local copy."
-fi
-
-# Check if conversations directory exists
+# Check if conversations directory and repo exist
 if [ ! -d "$REPO_DIR" ]; then
-    echo "No conversations to sync. Run claude-sync-push first on another machine."
+    echo "No conversations directory found."
+    echo "Run claude-sync-push first to initialize."
     cd "$ORIGINAL_DIR"
     exit 0
+fi
+
+# Pull from git if conversations repo exists
+if [ -d "$REPO_DIR/.git" ]; then
+    cd "$REPO_DIR"
+    if git remote | grep -q origin 2>/dev/null; then
+        echo "Pulling from remote..."
+        git pull origin "$CLAUDE_SYNC_BRANCH" 2>/dev/null || {
+            echo "Warning: Could not pull. Using local copy."
+        }
+    else
+        echo "No git remote configured in conversations/. Using local copy."
+    fi
+    cd "$SCRIPT_DIR"
+else
+    echo "No git repository in conversations/. Using local copy."
+    echo "Run claude-sync-push to initialize the repository."
 fi
 
 # Create Claude directory if it doesn't exist
