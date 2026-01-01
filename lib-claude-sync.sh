@@ -5,8 +5,8 @@
 # Load configuration with proper precedence
 load_config() {
     local SCRIPT_DIR="$1"
-
-    # Set defaults
+ 
+    # Set defaults (env vars preserved via ${:-} syntax in config files)
     CLAUDE_SYNC_REMOTE="${CLAUDE_SYNC_REMOTE:-}"
     CLAUDE_SYNC_BRANCH="${CLAUDE_SYNC_BRANCH:-main}"
     CLAUDE_SYNC_ENCRYPTION="${CLAUDE_SYNC_ENCRYPTION:-false}"
@@ -14,17 +14,15 @@ load_config() {
     CLAUDE_DATA_DIR="${CLAUDE_DATA_DIR:-$HOME/.claude}"
     CLAUDE_SYNC_VERBOSE="${CLAUDE_SYNC_VERBOSE:-false}"
 
-    # Load shared config if exists (lowest priority)
+    # Load shared config if exists (won't override env vars due to ${:-} syntax)
     if [ -f "$SCRIPT_DIR/.claude-sync-config" ]; then
         source "$SCRIPT_DIR/.claude-sync-config"
     fi
 
-    # Load local config if exists (medium priority)
+    # Load local config if exists (won't override env vars due to ${:-} syntax)
     if [ -f "$SCRIPT_DIR/.claude-sync-config.local" ]; then
         source "$SCRIPT_DIR/.claude-sync-config.local"
     fi
-
-    # Environment variables already loaded (highest priority)
 }
 
 # Validate required configuration

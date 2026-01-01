@@ -6,27 +6,27 @@
 # Environment variables (CLAUDE_SYNC_*) will override these settings.
 
 # Git branch to use (default: main)
-CLAUDE_SYNC_BRANCH="main"
+CLAUDE_SYNC_BRANCH="${CLAUDE_SYNC_BRANCH:-main}"
 
 # Enable encryption (requires git-crypt)
 # Set to "true" to enable, "false" to disable
-CLAUDE_SYNC_ENCRYPTION="false"
+CLAUDE_SYNC_ENCRYPTION="${CLAUDE_SYNC_ENCRYPTION:-false}"
 
 # Backup retention - how many days to keep backups
-CLAUDE_BACKUP_RETENTION_DAYS="30"
+CLAUDE_BACKUP_RETENTION_DAYS="${CLAUDE_BACKUP_RETENTION_DAYS:-30}"
 
 # Claude data directory (usually ~/.claude)
-CLAUDE_DATA_DIR="$HOME/.claude"
+CLAUDE_DATA_DIR="${CLAUDE_DATA_DIR:-$HOME/.claude}"
 
 # Verbose output (true/false)
-CLAUDE_SYNC_VERBOSE="false"
+CLAUDE_SYNC_VERBOSE="${CLAUDE_SYNC_VERBOSE:-false}"
 
-# Git remote URL - CONFIGURE THIS in .claude-sync-config.local
+# Git remote URL - CONFIGURE THIS in .claude-sync-config.local or via environment
 # Examples:
-#   CLAUDE_SYNC_REMOTE="git@bitbucket.org:username/claude-sync.git"
-#   CLAUDE_SYNC_REMOTE="git@github.com:username/claude-sync.git"
-CLAUDE_SYNC_REMOTE=""
+#   export CLAUDE_SYNC_REMOTE="git@bitbucket.org:username/claude-sync.git"
+#   export CLAUDE_SYNC_REMOTE="git@github.com:username/claude-sync.git"
+CLAUDE_SYNC_REMOTE="${CLAUDE_SYNC_REMOTE:-}"
 
 # Auto-commit message template
 # Available variables: {date}, {time}, {hostname}
-CLAUDE_SYNC_COMMIT_MSG="Sync conversations - {date} {time} - {hostname}"
+CLAUDE_SYNC_COMMIT_MSG="${CLAUDE_SYNC_COMMIT_MSG:-Sync conversations - {date} {time} - {hostname}}"
