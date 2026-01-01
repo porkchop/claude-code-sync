@@ -1,0 +1,122 @@
+#!/bin/bash
+# Claude Code Project Migration
+# Migrates a conversation from one project path to another
+
+set -e
+
+ORIGINAL_DIR="$(pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load configuration
+source "$SCRIPT_DIR/lib-claude-sync.sh"
+load_config "$SCRIPT_DIR"
+
+CLAUDE_DIR="$CLAUDE_DATA_DIR"
+
+echo "=== Claude Code Project Migration ==="
+echo ""
+
+# Check if arguments provided
+if [ $# -ne 2 ]; then
+    echo "Usage: claude-migrate-project <old-path> <new-path>"
+    echo ""
+    echo "Example:"
+    echo "  claude-migrate-project /home/aaron/dev/projects/aaron/claude /home/aaron/dev/projects/aaron/claude-code-sync"
+    echo ""
+    echo "This will move all conversations from the old project path to the new one."
+    echo ""
+    cd "$ORIGINAL_DIR"
+    exit 1
+fi
+
+OLD_PATH="$1"
+NEW_PATH="$2"
+
+# Convert paths to Claude's encoded format
+# Claude encodes paths by replacing / with -
+OLD_ENCODED=$(echo "$OLD_PATH" | sed 's/\//-/g')
+NEW_ENCODED=$(echo "$NEW_PATH" | sed 's/\//-/g')
+
+OLD_PROJECT_DIR="$CLAUDE_DIR/projects/$OLD_ENCODED"
+NEW_PROJECT_DIR="$CLAUDE_DIR/projects/$NEW_ENCODED"
+
+echo "Old path: $OLD_PATH"
+echo "New path: $NEW_PATH"
+echo ""
+echo "Old conversation directory: $OLD_PROJECT_DIR"
+echo "New conversation directory: $NEW_PROJECT_DIR"
+echo ""
+
+# Check if old project directory exists
+if [ ! -d "$OLD_PROJECT_DIR" ]; then
+    echo "Error: No conversations found for old path."
+    echo "Directory does not exist: $OLD_PROJECT_DIR"
+    echo ""
+    echo "Available project directories:"
+    ls -1 "$CLAUDE_DIR/projects/" 2>/dev/null || echo "  None"
+    cd "$ORIGINAL_DIR"
+    exit 1
+fi
+
+# Check if new project directory already exists
+if [ -d "$NEW_PROJECT_DIR" ]; then
+    echo "Warning: New project directory already exists!"
+    echo "This means you may have already opened Claude Code in the new path."
+    echo ""
+    echo "Options:"
+    echo "  1. Merge conversations (copy old conversations to new directory)"
+    echo "  2. Cancel migration"
+    echo ""
+    read -p "Choose option (1/2): " CHOICE
+
+    if [ "$CHOICE" = "1" ]; then
+        echo "Merging conversations..."
+        cp -r "$OLD_PROJECT_DIR"/* "$NEW_PROJECT_DIR/"
+        echo "Conversations merged."
+        echo ""
+        echo "The old project directory still exists at:"
+        echo "  $OLD_PROJECT_DIR"
+        echo ""
+        echo "You can safely delete it with:"
+        echo "  rm -rf '$OLD_PROJECT_DIR'"
+    else
+        echo "Migration cancelled."
+    fi
+    cd "$ORIGINAL_DIR"
+    exit 0
+fi
+
+# Count conversations to be migrated
+CONV_COUNT=$(find "$OLD_PROJECT_DIR" -name "*.jsonl" | wc -l)
+
+echo "Found $CONV_COUNT conversation(s) to migrate."
+echo ""
+read -p "Continue with migration? (yes/no): " CONFIRM
+
+if [ "$CONFIRM" != "yes" ]; then
+    echo "Migration cancelled."
+    cd "$ORIGINAL_DIR"
+    exit 0
+fi
+
+# Perform the migration (rename the directory)
+echo ""
+echo "Migrating conversations..."
+mv "$OLD_PROJECT_DIR" "$NEW_PROJECT_DIR"
+
+echo ""
+echo "✓ Migration complete!"
+echo ""
+echo "Conversations moved from:"
+echo "  $OLD_PROJECT_DIR"
+echo "to:"
+echo "  $NEW_PROJECT_DIR"
+echo ""
+echo "Next steps:"
+echo "  1. Close Claude Code if it's running"
+echo "  2. Rename your project directory: mv '$OLD_PATH' '$NEW_PATH'"
+echo "  3. Restart Claude Code in the new directory"
+echo "  4. Your conversation history should be preserved"
+echo ""
+
+cd "$ORIGINAL_DIR"
