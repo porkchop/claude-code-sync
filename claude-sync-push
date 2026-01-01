@@ -74,9 +74,36 @@ cd "$REPO_DIR"
 
 # Initialize git in conversations/ if not already done
 if [ ! -d ".git" ]; then
-    echo "Initializing git repository in conversations/..."
-    git init
-    git branch -M "$CLAUDE_SYNC_BRANCH"
+    if [ -n "$CLAUDE_SYNC_REMOTE" ]; then
+        # Try to clone from remote first (to get existing history)
+        echo "Cloning existing conversations from remote..."
+        cd "$SCRIPT_DIR"
+        rm -rf "$REPO_DIR"
+        if git clone "$CLAUDE_SYNC_REMOTE" "$REPO_DIR" 2>/dev/null; then
+            cd "$REPO_DIR"
+            git checkout "$CLAUDE_SYNC_BRANCH" 2>/dev/null || git checkout -b "$CLAUDE_SYNC_BRANCH"
+            # Re-run rsync to merge local files on top of cloned content
+            echo "Merging local conversations on top of remote..."
+            rsync -av --update "$CLAUDE_DIR/projects/" "$REPO_DIR/projects/"
+            rsync -av --update "$CLAUDE_DIR/file-history/" "$REPO_DIR/file-history/"
+            rsync -av --update "$CLAUDE_DIR/todos/" "$REPO_DIR/todos/"
+            if [ -f "$CLAUDE_DIR/history.jsonl" ]; then
+                cp "$CLAUDE_DIR/history.jsonl" "$REPO_DIR/history.jsonl"
+            fi
+        else
+            # Clone failed (empty or non-existent remote), initialize fresh
+            echo "Remote empty or unavailable. Initializing new repository..."
+            mkdir -p "$REPO_DIR"
+            cd "$REPO_DIR"
+            git init
+            git branch -M "$CLAUDE_SYNC_BRANCH"
+            git remote add origin "$CLAUDE_SYNC_REMOTE"
+        fi
+    else
+        echo "Initializing git repository in conversations/..."
+        git init
+        git branch -M "$CLAUDE_SYNC_BRANCH"
+    fi
 fi
 
 # Set remote if configured and not already set
