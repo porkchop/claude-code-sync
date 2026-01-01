@@ -82,12 +82,38 @@ case "$CHOICE" in
         ;;
 esac
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$SCRIPT_DIR/conversations"
+
 echo ""
 echo "Key saved to: $KEY_PATH"
 echo ""
-echo "Now you can unlock the repository:"
-echo "  cd ~/dev/projects/aaron/claude"
-echo "  git-crypt unlock $KEY_PATH"
+
+# Offer to unlock the repository
+if [ -d "$REPO_DIR/.git" ]; then
+    read -p "Unlock the conversations repository now? (yes/no): " UNLOCK
+    if [ "$UNLOCK" = "yes" ]; then
+        cd "$REPO_DIR"
+        if git-crypt unlock "$KEY_PATH"; then
+            echo ""
+            echo "Repository unlocked successfully!"
+        else
+            echo ""
+            echo "Failed to unlock. You may need to unlock manually:"
+            echo "  cd $REPO_DIR"
+            echo "  git-crypt unlock $KEY_PATH"
+        fi
+    else
+        echo "To unlock manually later:"
+        echo "  cd $REPO_DIR"
+        echo "  git-crypt unlock $KEY_PATH"
+    fi
+else
+    echo "Conversations repository not found."
+    echo "Run 'claude-sync-push' first, then unlock with:"
+    echo "  cd $REPO_DIR"
+    echo "  git-crypt unlock $KEY_PATH"
+fi
 echo ""
 
 cd "$ORIGINAL_DIR"

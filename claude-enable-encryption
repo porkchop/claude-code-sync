@@ -27,15 +27,17 @@ if ! command -v git-crypt &> /dev/null; then
     exit 1
 fi
 
-cd "$SCRIPT_DIR"
+REPO_DIR="$SCRIPT_DIR/conversations"
 
-# Check if git is initialized
-if [ ! -d ".git" ]; then
-    echo "Error: Git repository not initialized."
+# Check if conversations repo exists
+if [ ! -d "$REPO_DIR/.git" ]; then
+    echo "Error: Conversations repository not initialized."
     echo "Run 'claude-sync-push' first to initialize the repository."
     cd "$ORIGINAL_DIR"
     exit 1
 fi
+
+cd "$REPO_DIR"
 
 # Check if git-crypt is already initialized
 if [ -d ".git/git-crypt" ]; then
@@ -57,7 +59,7 @@ if [ -d ".git/git-crypt" ]; then
 fi
 
 # Warn about existing conversations
-if [ -d "conversations" ] && [ "$(find conversations -type f | wc -l)" -gt 0 ]; then
+if [ "$(find . -type f -name '*.jsonl' | wc -l)" -gt 0 ]; then
     echo "WARNING: You have existing unencrypted conversations."
     echo ""
     echo "After enabling encryption:"
@@ -77,10 +79,12 @@ echo ""
 echo "Initializing git-crypt..."
 git-crypt init
 
-echo "Configuring encryption for conversations directory..."
+echo "Configuring encryption for conversation files..."
 cat > .gitattributes <<EOF
 # Encrypt all conversation data
-conversations/** filter=git-crypt diff=git-crypt
+* filter=git-crypt diff=git-crypt
+.gitattributes !filter !diff
+.gitignore !filter !diff
 EOF
 
 git add .gitattributes
