@@ -26,3 +26,7 @@ CLAUDE_SYNC_VERBOSE="false"
 #   CLAUDE_SYNC_REMOTE="git@bitbucket.org:username/claude-sync.git"
 #   CLAUDE_SYNC_REMOTE="git@github.com:username/claude-sync.git"
 CLAUDE_SYNC_REMOTE=""
+
+# Auto-commit message template
+# Available variables: {date}, {time}, {hostname}
+CLAUDE_SYNC_COMMIT_MSG="Sync conversations - {date} {time} - {hostname}"
