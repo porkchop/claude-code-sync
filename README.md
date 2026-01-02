@@ -137,6 +137,10 @@ Conversations **accumulate** across all machines:
 - **Machine B** has conversations 3, 4, 5 (conversation 3 updated more recently)
 - After syncing: **Both machines have 1, 2, 3 (B's version), 4, 5**
 
+⚠️ **Important:** Claude Code stores conversations by project path. For sync to work correctly, **your projects must be at the same absolute paths on all machines**. For example, if you work in `/home/alice/projects/myapp` on one machine, use the same path on others.
+
+If you need to move a project, use `claude-migrate-project` to update the conversation paths (see Utilities below).
+
 ### 🔐 Optional Encryption
 
 Enable transparent encryption with git-crypt:
@@ -280,6 +284,15 @@ See [SECURITY.md](SECURITY.md) for full security analysis and encryption guide.
 ### Encryption Commands
 - `claude-enable-encryption` - Enable git-crypt encryption
 - `claude-restore-encryption-key` - Restore encryption key from password manager
+
+### Utility Commands
+- `claude-migrate-project <old-path> <new-path>` - Migrate conversations when renaming/moving a project
+
+**Example:** If you move a project from `/home/user/old-name` to `/home/user/new-name`:
+```bash
+claude-migrate-project /home/user/old-name /home/user/new-name
+mv /home/user/old-name /home/user/new-name
+```
 
 ## Troubleshooting
 
