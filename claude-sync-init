@@ -98,11 +98,8 @@ if git ls-remote "$CLAUDE_SYNC_REMOTE" &>/dev/null; then
             else
                 echo "No encryption key found at: $KEY_PATH"
                 echo ""
-                echo "To unlock this repository:"
-                echo "  1. Run: claude-restore-encryption-key"
-                echo "  2. Then run: claude-sync-init (again)"
-                cd "$ORIGINAL_DIR"
-                exit 1
+                echo "Repository cloned but locked."
+                echo "To unlock: run 'claude-restore-encryption-key'"
             fi
         fi
 

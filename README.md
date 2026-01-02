@@ -108,16 +108,16 @@ export PATH="$HOME/claude-code-sync:$PATH"
    claude-backup
    ```
 
-5. **If using encryption**, restore your key first:
-   ```bash
-   claude-restore-encryption-key
-   ```
-
-6. **Initialize and clone the repository**:
+5. **Initialize and clone the repository**:
    ```bash
    claude-sync-init
    ```
-   This will clone from remote and unlock encryption if needed.
+
+6. **If the repository is encrypted**, restore your key and unlock:
+   ```bash
+   claude-restore-encryption-key
+   ```
+   This will restore your key from your password manager and unlock the repository.
 
 7. **Sync conversations to your local Claude**:
    ```bash
