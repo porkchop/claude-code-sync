@@ -34,7 +34,32 @@ export PATH="$HOME/claude-code-sync:$PATH"
 
 ### Initial Setup (First Machine)
 
-1. **Create a git repository** for your conversations on GitHub/Bitbucket/GitLab (private repo recommended)
+1. **Create a private git repository** for your conversations:
+
+   **GitHub:**
+   - Go to https://github.com/new
+   - Name it something like `claude-conversations`
+   - Select **Private**
+   - Leave "Initialize with README" unchecked (empty repo)
+   - Click "Create repository"
+   - Copy the SSH URL: `git@github.com:username/claude-conversations.git`
+
+   **Bitbucket:**
+   - Go to https://bitbucket.org/repo/create
+   - Name it something like `claude-conversations`
+   - Set Access level to **Private**
+   - Click "Create repository"
+   - Copy the SSH URL: `git@bitbucket.org:username/claude-conversations.git`
+
+   **GitLab:**
+   - Go to https://gitlab.com/projects/new
+   - Name it something like `claude-conversations`
+   - Set Visibility to **Private**
+   - Uncheck "Initialize repository with a README"
+   - Click "Create project"
+   - Copy the SSH URL: `git@gitlab.com:username/claude-conversations.git`
+
+   > **Note:** Make sure you have SSH keys set up for your git provider. If `git clone git@github.com:...` works for your other repos, you're all set. Otherwise, see your provider's SSH key documentation.
 
 2. **Configure sync settings**:
    ```bash
