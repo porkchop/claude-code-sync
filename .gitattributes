@@ -1,2 +1,0 @@
-# Encrypt all conversation data
-conversations/** filter=git-crypt diff=git-crypt
