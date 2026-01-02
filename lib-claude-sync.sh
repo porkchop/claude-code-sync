@@ -13,6 +13,7 @@ load_config() {
     CLAUDE_BACKUP_RETENTION_DAYS="${CLAUDE_BACKUP_RETENTION_DAYS:-30}"
     CLAUDE_DATA_DIR="${CLAUDE_DATA_DIR:-$HOME/.claude}"
     CLAUDE_SYNC_VERBOSE="${CLAUDE_SYNC_VERBOSE:-false}"
+    CLAUDE_SYNC_COMMIT_MSG="${CLAUDE_SYNC_COMMIT_MSG:-Sync conversations - {date} {time} - {hostname}}"
 
     # Load shared config if exists (won't override env vars due to ${:-} syntax)
     if [ -f "$SCRIPT_DIR/.claude-sync-config" ]; then
