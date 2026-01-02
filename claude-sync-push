@@ -1,12 +1,10 @@
 #!/bin/bash
-# Claude Code Conversation Sync - Push to Bitbucket
-# Syncs conversations from ~/.claude to this repo and pushes to Bitbucket
+# Claude Code Conversation Sync - Push
+# Syncs conversations from ~/.claude to repo and pushes to remote
 
 set -e
 
-# Save original directory to return to it at the end
 ORIGINAL_DIR="$(pwd)"
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Load configuration
@@ -27,26 +25,40 @@ if ! validate_config; then
     exit 1
 fi
 
-log_verbose "Using remote: $CLAUDE_SYNC_REMOTE"
-log_verbose "Using branch: $CLAUDE_SYNC_BRANCH"
-
-# Create conversations directory if it doesn't exist
-mkdir -p "$REPO_DIR"
-
-# Pull latest from git first (if conversations repo exists)
-if [ -d "$REPO_DIR/.git" ]; then
-    cd "$REPO_DIR"
-    if git remote | grep -q origin 2>/dev/null; then
-        echo "Pulling latest conversations from remote..."
-        git pull origin "$CLAUDE_SYNC_BRANCH" 2>/dev/null || {
-            echo "Note: Could not pull. Continuing with local merge..."
-        }
-        echo ""
-    fi
-    cd "$SCRIPT_DIR"
+# Check if repo is initialized
+if [ ! -d "$REPO_DIR/.git" ]; then
+    echo "Error: Conversations repository not initialized."
+    echo ""
+    echo "Run 'claude-sync-init' first to set up the repository."
+    cd "$ORIGINAL_DIR"
+    exit 1
 fi
 
-# Create directory structure inside conversations/
+cd "$REPO_DIR"
+
+# Check if encrypted repo is locked
+if [ -d ".git/git-crypt" ]; then
+    # Check for encrypted but not decrypted files
+    if git-crypt status 2>/dev/null | grep -q "not decrypted"; then
+        echo "Error: Repository is encrypted but locked."
+        echo ""
+        echo "Unlock first with: claude-restore-encryption-key"
+        echo "Or manually: cd $REPO_DIR && git-crypt unlock ~/.claude-git-crypt.key"
+        cd "$ORIGINAL_DIR"
+        exit 1
+    fi
+fi
+
+# Pull latest from remote first
+if git remote | grep -q origin 2>/dev/null; then
+    echo "Pulling latest from remote..."
+    git pull origin "$CLAUDE_SYNC_BRANCH" 2>/dev/null || {
+        echo "Note: Could not pull. Continuing with local merge..."
+    }
+    echo ""
+fi
+
+# Create directory structure
 mkdir -p "$REPO_DIR/projects"
 mkdir -p "$REPO_DIR/file-history"
 mkdir -p "$REPO_DIR/todos"
@@ -63,53 +75,10 @@ rsync -av --update "$CLAUDE_DIR/file-history/" "$REPO_DIR/file-history/"
 echo "Merging todos..."
 rsync -av --update "$CLAUDE_DIR/todos/" "$REPO_DIR/todos/"
 
-# Sync global history (without credentials)
+# Sync global history
 echo "Syncing global history..."
 if [ -f "$CLAUDE_DIR/history.jsonl" ]; then
     cp "$CLAUDE_DIR/history.jsonl" "$REPO_DIR/history.jsonl"
-fi
-
-# Git operations - work in conversations/ directory
-cd "$REPO_DIR"
-
-# Initialize git in conversations/ if not already done
-if [ ! -d ".git" ]; then
-    if [ -n "$CLAUDE_SYNC_REMOTE" ]; then
-        # Try to clone from remote first (to get existing history)
-        echo "Cloning existing conversations from remote..."
-        cd "$SCRIPT_DIR"
-        rm -rf "$REPO_DIR"
-        if git clone "$CLAUDE_SYNC_REMOTE" "$REPO_DIR" 2>/dev/null; then
-            cd "$REPO_DIR"
-            git checkout "$CLAUDE_SYNC_BRANCH" 2>/dev/null || git checkout -b "$CLAUDE_SYNC_BRANCH"
-            # Re-run rsync to merge local files on top of cloned content
-            echo "Merging local conversations on top of remote..."
-            rsync -av --update "$CLAUDE_DIR/projects/" "$REPO_DIR/projects/"
-            rsync -av --update "$CLAUDE_DIR/file-history/" "$REPO_DIR/file-history/"
-            rsync -av --update "$CLAUDE_DIR/todos/" "$REPO_DIR/todos/"
-            if [ -f "$CLAUDE_DIR/history.jsonl" ]; then
-                cp "$CLAUDE_DIR/history.jsonl" "$REPO_DIR/history.jsonl"
-            fi
-        else
-            # Clone failed (empty or non-existent remote), initialize fresh
-            echo "Remote empty or unavailable. Initializing new repository..."
-            mkdir -p "$REPO_DIR"
-            cd "$REPO_DIR"
-            git init
-            git branch -M "$CLAUDE_SYNC_BRANCH"
-            git remote add origin "$CLAUDE_SYNC_REMOTE"
-        fi
-    else
-        echo "Initializing git repository in conversations/..."
-        git init
-        git branch -M "$CLAUDE_SYNC_BRANCH"
-    fi
-fi
-
-# Set remote if configured and not already set
-if [ -n "$CLAUDE_SYNC_REMOTE" ] && ! git remote | grep -q origin 2>/dev/null; then
-    echo "Adding git remote: $CLAUDE_SYNC_REMOTE"
-    git remote add origin "$CLAUDE_SYNC_REMOTE"
 fi
 
 # Check if there are changes
@@ -132,14 +101,12 @@ COMMIT_MSG="${COMMIT_MSG//\{hostname\}/$(hostname)}"
 
 git commit -m "$COMMIT_MSG"
 
-# Push if remote exists
+# Push to remote
 if git remote | grep -q origin; then
     echo "Pushing to remote..."
     git push origin "$CLAUDE_SYNC_BRANCH" || {
-        echo "Warning: Could not push. You may need to set up the remote first:"
-        echo "  cd $REPO_DIR"
-        echo "  git remote add origin $CLAUDE_SYNC_REMOTE"
-        echo "  git push -u origin $CLAUDE_SYNC_BRANCH"
+        echo "Warning: Could not push."
+        echo "  You may need to pull first or resolve conflicts."
     }
 else
     echo ""
@@ -149,5 +116,4 @@ fi
 echo ""
 echo "Sync complete!"
 
-# Return to original directory
 cd "$ORIGINAL_DIR"

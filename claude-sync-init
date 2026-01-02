@@ -1,0 +1,139 @@
+#!/bin/bash
+# Claude Code Conversation Sync - Initialize Repository
+# Sets up the conversations folder, clones from remote if exists, handles encryption
+
+set -e
+
+ORIGINAL_DIR="$(pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load configuration
+source "$SCRIPT_DIR/lib-claude-sync.sh"
+load_config "$SCRIPT_DIR"
+
+REPO_DIR="$SCRIPT_DIR/conversations"
+KEY_PATH="$HOME/.claude-git-crypt.key"
+
+echo "=== Claude Code Conversation Sync - Initialize ==="
+echo ""
+
+# Check if already initialized
+if [ -d "$REPO_DIR/.git" ]; then
+    echo "Conversations repository already initialized at: $REPO_DIR"
+    echo ""
+
+    # Check encryption status
+    if [ -d "$REPO_DIR/.git/git-crypt" ]; then
+        cd "$REPO_DIR"
+        if git-crypt status &>/dev/null 2>&1; then
+            # Check if any files are encrypted but not decrypted
+            if git-crypt status 2>/dev/null | grep -q "not decrypted"; then
+                echo "Repository is encrypted but LOCKED."
+                echo ""
+                if [ -f "$KEY_PATH" ]; then
+                    read -p "Unlock with existing key at $KEY_PATH? (yes/no): " UNLOCK
+                    if [ "$UNLOCK" = "yes" ]; then
+                        git-crypt unlock "$KEY_PATH" && echo "Unlocked successfully!" || echo "Failed to unlock."
+                    fi
+                else
+                    echo "To unlock, run: claude-restore-encryption-key"
+                fi
+            else
+                echo "Repository is encrypted and unlocked."
+            fi
+        fi
+        cd "$ORIGINAL_DIR"
+    fi
+    exit 0
+fi
+
+# Validate we have a remote configured
+if [ -z "$CLAUDE_SYNC_REMOTE" ]; then
+    echo "Error: CLAUDE_SYNC_REMOTE not configured."
+    echo ""
+    echo "Set it by:"
+    echo "  1. Running: claude-config"
+    echo "  2. Or: export CLAUDE_SYNC_REMOTE=\"git@github.com:user/repo.git\""
+    echo ""
+    cd "$ORIGINAL_DIR"
+    exit 1
+fi
+
+echo "Remote: $CLAUDE_SYNC_REMOTE"
+echo "Branch: $CLAUDE_SYNC_BRANCH"
+echo ""
+
+# Try to clone from remote
+echo "Checking remote repository..."
+if git ls-remote "$CLAUDE_SYNC_REMOTE" &>/dev/null; then
+    echo "Remote repository found. Cloning..."
+    if git clone "$CLAUDE_SYNC_REMOTE" "$REPO_DIR"; then
+        cd "$REPO_DIR"
+        git checkout "$CLAUDE_SYNC_BRANCH" 2>/dev/null || git checkout -b "$CLAUDE_SYNC_BRANCH"
+
+        # Check if repo uses encryption
+        if [ -d ".git/git-crypt" ]; then
+            echo ""
+            echo "This repository uses encryption."
+            echo ""
+
+            if [ -f "$KEY_PATH" ]; then
+                echo "Found encryption key at: $KEY_PATH"
+                read -p "Unlock repository now? (yes/no): " UNLOCK
+                if [ "$UNLOCK" = "yes" ]; then
+                    if git-crypt unlock "$KEY_PATH"; then
+                        echo "Repository unlocked successfully!"
+                    else
+                        echo ""
+                        echo "Failed to unlock. The key may not match."
+                        echo "Try restoring the correct key with: claude-restore-encryption-key"
+                        cd "$ORIGINAL_DIR"
+                        exit 1
+                    fi
+                else
+                    echo ""
+                    echo "Repository cloned but still locked."
+                    echo "Unlock later with: cd $REPO_DIR && git-crypt unlock $KEY_PATH"
+                fi
+            else
+                echo "No encryption key found at: $KEY_PATH"
+                echo ""
+                echo "To unlock this repository:"
+                echo "  1. Run: claude-restore-encryption-key"
+                echo "  2. Then run: claude-sync-init (again)"
+                cd "$ORIGINAL_DIR"
+                exit 1
+            fi
+        fi
+
+        echo ""
+        echo "Repository initialized successfully!"
+        cd "$ORIGINAL_DIR"
+    else
+        echo "Failed to clone repository."
+        cd "$ORIGINAL_DIR"
+        exit 1
+    fi
+else
+    # Remote doesn't exist or is empty - initialize fresh
+    echo "Remote repository is empty or doesn't exist. Initializing fresh..."
+    mkdir -p "$REPO_DIR"
+    cd "$REPO_DIR"
+    git init
+    git branch -M "$CLAUDE_SYNC_BRANCH"
+    git remote add origin "$CLAUDE_SYNC_REMOTE"
+
+    # Create initial structure
+    mkdir -p projects file-history todos
+
+    echo ""
+    echo "Fresh repository initialized."
+    echo ""
+    echo "Next steps:"
+    echo "  1. (Optional) Enable encryption: claude-enable-encryption"
+    echo "  2. Sync your conversations: claude-sync-push"
+fi
+
+echo ""
+echo "Initialization complete!"
+cd "$ORIGINAL_DIR"

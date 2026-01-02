@@ -32,7 +32,7 @@ Add to your PATH (add this to `~/.bashrc` or `~/.zshrc`):
 export PATH="$HOME/claude-code-sync:$PATH"
 ```
 
-### Initial Setup
+### Initial Setup (First Machine)
 
 1. **Create a git repository** for your conversations on GitHub/Bitbucket/GitLab (private repo recommended)
 
@@ -40,17 +40,24 @@ export PATH="$HOME/claude-code-sync:$PATH"
    ```bash
    claude-config
    ```
-   This will prompt you for:
-   - Git remote URL (e.g., `git@github.com:username/claude-conversations.git`)
-   - Git branch (default: `main`)
-   - Whether to enable encryption
 
 3. **Create your first backup** (safety first!):
    ```bash
    claude-backup
    ```
 
-4. **Start syncing**:
+4. **Initialize the repository**:
+   ```bash
+   claude-sync-init
+   ```
+
+5. **(Optional) Enable encryption**:
+   ```bash
+   claude-enable-encryption
+   ```
+   Save the encryption key to your password manager (KeePass, 1Password, etc.)
+
+6. **Push your conversations**:
    ```bash
    claude-sync-push
    ```
@@ -76,13 +83,28 @@ export PATH="$HOME/claude-code-sync:$PATH"
    claude-backup
    ```
 
-5. **Sync bidirectionally**:
+5. **If using encryption**, restore your key first:
    ```bash
-   claude-sync-pull   # Get conversations from other machines
-   claude-sync-push   # Add this machine's conversations to the pool
+   claude-restore-encryption-key
    ```
 
-6. **Restart Claude Code** to see all synced conversations
+6. **Initialize and clone the repository**:
+   ```bash
+   claude-sync-init
+   ```
+   This will clone from remote and unlock encryption if needed.
+
+7. **Sync conversations to your local Claude**:
+   ```bash
+   claude-sync-pull
+   ```
+
+8. **Add this machine's conversations to the pool**:
+   ```bash
+   claude-sync-push
+   ```
+
+9. **Restart Claude Code** to see all synced conversations
 
 ## Daily Usage
 
@@ -123,20 +145,23 @@ Enable transparent encryption with git-crypt:
 # Install git-crypt
 sudo apt install git-crypt  # Ubuntu/Debian
 brew install git-crypt      # macOS
-
-# Enable encryption
-claude-enable-encryption
 ```
 
-The script will:
-- Set up git-crypt
-- Generate encryption key
-- Display key in base64 for storage in password manager
-- Encrypt all conversations on the remote
+**First machine (enable encryption):**
+```bash
+claude-sync-init             # Initialize repo first
+claude-enable-encryption     # Set up encryption, generates key
+claude-sync-push             # Push encrypted conversations
+```
+
+The script will generate an encryption key and display it in base64 format.
+**Save this key to your password manager immediately!**
 
 **On other machines:**
 ```bash
-claude-restore-encryption-key  # Interactive helper to restore from password manager
+claude-restore-encryption-key  # Restore key from password manager
+claude-sync-init               # Clone and unlock repository
+claude-sync-pull               # Sync conversations
 ```
 
 ### 💾 Backup & Restore
@@ -184,6 +209,11 @@ See [CONFIGURATION.md](CONFIGURATION.md) for detailed configuration guide.
 ## How It Works
 
 ### Sync Strategy
+
+**Init** (`claude-sync-init`):
+1. Clones conversations repository from remote (or initializes fresh if empty)
+2. Detects encryption and prompts for unlock if needed
+3. Prepares repository for push/pull operations
 
 **Push** (`claude-sync-push`):
 1. Pulls latest from remote (avoid conflicts)
@@ -233,8 +263,11 @@ See [SECURITY.md](SECURITY.md) for full security analysis and encryption guide.
 
 ## Commands Reference
 
-### Sync Commands
+### Setup Commands
 - `claude-config` - Interactive configuration wizard
+- `claude-sync-init` - Initialize/clone the conversations repository
+
+### Sync Commands
 - `claude-sync-push` - Sync local → remote (pull, merge, push)
 - `claude-sync-pull` - Sync remote → local
 - `claude-sync-status` - Show status and configuration
@@ -244,11 +277,18 @@ See [SECURITY.md](SECURITY.md) for full security analysis and encryption guide.
 - `claude-backup-list` - List available backups
 - `claude-restore <name>` - Restore from backup
 
-### Security Commands
+### Encryption Commands
 - `claude-enable-encryption` - Enable git-crypt encryption
-- `claude-restore-encryption-key` - Restore encryption key from backup
+- `claude-restore-encryption-key` - Restore encryption key from password manager
 
 ## Troubleshooting
+
+### "Repository not initialized" error
+- Run `claude-sync-init` before using `claude-sync-push` or `claude-sync-pull`
+
+### "Repository is encrypted but locked" error
+- Restore your encryption key: `claude-restore-encryption-key`
+- Then re-run `claude-sync-init` to unlock
 
 ### Conversations not appearing
 - Restart Claude Code after `claude-sync-pull`
@@ -259,10 +299,9 @@ See [SECURITY.md](SECURITY.md) for full security analysis and encryption guide.
 - Check git credentials
 - Ensure you have write access to repository
 
-### Encryption issues
-- Ensure git-crypt installed: `which git-crypt`
-- Check if repo is unlocked: `git-crypt status`
-- Verify you have the encryption key
+### Encryption key mismatch
+- Ensure you're using the correct key from your password manager
+- If key was lost, you'll need to start fresh with a new encrypted repo
 
 ### Configuration errors
 - Run `claude-sync-status` to see current config

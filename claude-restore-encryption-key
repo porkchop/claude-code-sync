@@ -110,9 +110,8 @@ if [ -d "$REPO_DIR/.git" ]; then
     fi
 else
     echo "Conversations repository not found."
-    echo "Run 'claude-sync-push' first, then unlock with:"
-    echo "  cd $REPO_DIR"
-    echo "  git-crypt unlock $KEY_PATH"
+    echo ""
+    echo "Next step: Run 'claude-sync-init' to clone and unlock the repository."
 fi
 echo ""
 

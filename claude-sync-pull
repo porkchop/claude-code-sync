@@ -23,30 +23,40 @@ echo ""
 
 log_verbose "Using branch: $CLAUDE_SYNC_BRANCH"
 
-# Check if conversations directory and repo exist
-if [ ! -d "$REPO_DIR" ]; then
-    echo "No conversations directory found."
-    echo "Run claude-sync-push first to initialize."
+# Check if repo is initialized
+if [ ! -d "$REPO_DIR/.git" ]; then
+    echo "Error: Conversations repository not initialized."
+    echo ""
+    echo "Run 'claude-sync-init' first to set up the repository."
     cd "$ORIGINAL_DIR"
-    exit 0
+    exit 1
 fi
 
-# Pull from git if conversations repo exists
-if [ -d "$REPO_DIR/.git" ]; then
-    cd "$REPO_DIR"
-    if git remote | grep -q origin 2>/dev/null; then
-        echo "Pulling from remote..."
-        git pull origin "$CLAUDE_SYNC_BRANCH" 2>/dev/null || {
-            echo "Warning: Could not pull. Using local copy."
-        }
-    else
-        echo "No git remote configured in conversations/. Using local copy."
+cd "$REPO_DIR"
+
+# Check if encrypted repo is locked
+if [ -d ".git/git-crypt" ]; then
+    if git-crypt status 2>/dev/null | grep -q "not decrypted"; then
+        echo "Error: Repository is encrypted but locked."
+        echo ""
+        echo "Unlock first with: claude-restore-encryption-key"
+        echo "Or manually: cd $REPO_DIR && git-crypt unlock ~/.claude-git-crypt.key"
+        cd "$ORIGINAL_DIR"
+        exit 1
     fi
-    cd "$SCRIPT_DIR"
-else
-    echo "No git repository in conversations/. Using local copy."
-    echo "Run claude-sync-push to initialize the repository."
 fi
+
+# Pull from remote
+if git remote | grep -q origin 2>/dev/null; then
+    echo "Pulling from remote..."
+    git pull origin "$CLAUDE_SYNC_BRANCH" 2>/dev/null || {
+        echo "Warning: Could not pull. Using local copy."
+    }
+else
+    echo "No git remote configured. Using local copy."
+fi
+
+cd "$SCRIPT_DIR"
 
 # Create Claude directory if it doesn't exist
 mkdir -p "$CLAUDE_DIR"
