@@ -179,13 +179,7 @@ If you need to move a project, use `claude-migrate-project` to update the conver
 
 ### 🔐 Optional Encryption
 
-Enable transparent encryption with git-crypt:
-
-```bash
-# Install git-crypt
-sudo apt install git-crypt  # Ubuntu/Debian
-brew install git-crypt      # macOS
-```
+Enable transparent encryption with git-crypt. See [Requirements](#installing-git-crypt-for-encryption) section for installation on your platform.
 
 **First machine (enable encryption):**
 ```bash
@@ -367,16 +361,70 @@ mv /home/user/old-name /home/user/new-name
 
 ## Requirements
 
+### Core Dependencies
 - Bash 4.0+
 - Git
 - rsync
 - tar, gzip
 - git-crypt (optional, for encryption)
 
-**Supported platforms:**
-- Linux (Ubuntu, Debian, Fedora, Arch, etc.)
-- macOS
-- Windows (WSL)
+### Platform Support
+
+**✅ Linux (Tested & Recommended)**
+- Ubuntu/Debian - Fully tested and working
+- Fedora/RHEL/CentOS - Should work (standard bash/git/rsync)
+- Arch Linux - Should work
+- Pop!_OS - Should work (Ubuntu-based)
+
+All standard Linux distributions with bash 4.0+ should work out of the box.
+
+**✅ macOS (Should Work)**
+- macOS 10.14+ - Should work
+- Comes with bash, git, rsync by default
+- May need to install git-crypt via Homebrew
+- Note: Default shell is zsh, but bash scripts run fine
+
+**✅ Windows WSL (Should Work)**
+- WSL 1 or WSL 2 with Ubuntu/Debian - Should work
+- Treats WSL as a Linux environment
+- All Linux instructions apply
+
+**❌ Windows Native (Not Supported)**
+- Git Bash - Limited support, not recommended
+- PowerShell - Not compatible (bash scripts only)
+- Native Windows - Not supported
+
+### Installing git-crypt (for encryption)
+
+**Ubuntu/Debian/Pop!_OS:**
+```bash
+sudo apt update
+sudo apt install git-crypt
+```
+
+**Fedora/RHEL/CentOS:**
+```bash
+sudo dnf install git-crypt     # Fedora/RHEL 8+
+# OR
+sudo yum install git-crypt     # CentOS/RHEL 7
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S git-crypt
+```
+
+**macOS:**
+```bash
+brew install git-crypt
+```
+
+**Windows WSL:**
+Use the Linux distribution's package manager (usually `apt` for Ubuntu):
+```bash
+sudo apt update
+sudo apt install git-crypt
+```
 
 ## Contributing
 
