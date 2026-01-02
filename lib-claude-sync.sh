@@ -69,3 +69,16 @@ log_verbose() {
         echo "$@"
     fi
 }
+
+# Show version from VERSION file
+show_version() {
+    local SCRIPT_DIR="$1"
+    local COMMAND_NAME="$2"
+
+    if [ -f "$SCRIPT_DIR/VERSION" ]; then
+        local VERSION=$(cat "$SCRIPT_DIR/VERSION")
+        echo "$COMMAND_NAME version $VERSION"
+    else
+        echo "$COMMAND_NAME version unknown (VERSION file not found)"
+    fi
+}

@@ -1,0 +1,182 @@
+#!/bin/bash
+# Claude Code Sync - Release Helper
+# Simplifies version bumping and release creation
+
+set -e
+
+ORIGINAL_DIR="$(pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+VERSION_FILE="$SCRIPT_DIR/VERSION"
+CHANGELOG_FILE="$SCRIPT_DIR/CHANGELOG.md"
+
+echo "=== Claude Code Sync - Release Helper ==="
+echo ""
+
+# Check if VERSION file exists
+if [ ! -f "$VERSION_FILE" ]; then
+    echo "Error: VERSION file not found at $VERSION_FILE"
+    exit 1
+fi
+
+# Read current version
+CURRENT_VERSION=$(cat "$VERSION_FILE")
+echo "Current version: $CURRENT_VERSION"
+echo ""
+
+# Parse version components
+IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+
+# Show usage if no arguments
+if [ $# -eq 0 ]; then
+    echo "Usage: claude-release <version-type|version>"
+    echo ""
+    echo "Version types:"
+    echo "  major   - Bump major version (breaking changes)"
+    echo "  minor   - Bump minor version (new features)"
+    echo "  patch   - Bump patch version (bug fixes)"
+    echo ""
+    echo "Or specify exact version:"
+    echo "  claude-release 1.2.3"
+    echo ""
+    echo "Examples:"
+    echo "  claude-release patch  # $CURRENT_VERSION -> ${MAJOR}.${MINOR}.$((PATCH + 1))"
+    echo "  claude-release minor  # $CURRENT_VERSION -> ${MAJOR}.$((MINOR + 1)).0"
+    echo "  claude-release major  # $CURRENT_VERSION -> $((MAJOR + 1)).0.0"
+    echo "  claude-release 2.0.0  # $CURRENT_VERSION -> 2.0.0"
+    exit 1
+fi
+
+VERSION_ARG="$1"
+
+# Calculate new version
+case "$VERSION_ARG" in
+    major)
+        NEW_VERSION="$((MAJOR + 1)).0.0"
+        ;;
+    minor)
+        NEW_VERSION="${MAJOR}.$((MINOR + 1)).0"
+        ;;
+    patch)
+        NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+        ;;
+    *)
+        # Assume it's a specific version
+        if [[ ! "$VERSION_ARG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Invalid version format: $VERSION_ARG"
+            echo "Version must be in format: X.Y.Z (e.g., 1.2.3)"
+            exit 1
+        fi
+        NEW_VERSION="$VERSION_ARG"
+        ;;
+esac
+
+echo "New version will be: $NEW_VERSION"
+echo ""
+
+# Check for uncommitted changes
+if [ -n "$(git status --porcelain)" ]; then
+    echo "Warning: You have uncommitted changes."
+    echo ""
+    git status --short
+    echo ""
+    read -p "Continue anyway? (yes/no): " CONTINUE
+    if [ "$CONTINUE" != "yes" ]; then
+        echo "Release cancelled."
+        exit 0
+    fi
+    echo ""
+fi
+
+# Confirm release
+read -p "Create release v$NEW_VERSION? (yes/no): " CONFIRM
+if [ "$CONFIRM" != "yes" ]; then
+    echo "Release cancelled."
+    exit 0
+fi
+
+echo ""
+echo "Creating release..."
+echo ""
+
+# Update VERSION file
+echo "$NEW_VERSION" > "$VERSION_FILE"
+echo "✓ Updated VERSION file"
+
+# Prepare CHANGELOG entry
+TODAY=$(date '+%Y-%m-%d')
+CHANGELOG_ENTRY="## [$NEW_VERSION] - $TODAY
+
+### Added
+-
+
+### Changed
+-
+
+### Fixed
+-
+
+"
+
+# Update CHANGELOG.md (insert after the header, before first release)
+if [ -f "$CHANGELOG_FILE" ]; then
+    # Find the line number where we should insert (after "## [Unreleased]" or similar header)
+    # We'll insert after the first blank line following the header
+    awk -v entry="$CHANGELOG_ENTRY" '
+        /^## \[.*\]/ && !found {
+            print entry
+            found=1
+        }
+        {print}
+    ' "$CHANGELOG_FILE" > "$CHANGELOG_FILE.tmp"
+    mv "$CHANGELOG_FILE.tmp" "$CHANGELOG_FILE"
+    echo "✓ Updated CHANGELOG.md (please edit to add release notes)"
+else
+    echo "Warning: CHANGELOG.md not found, skipping"
+fi
+
+# Prompt to edit CHANGELOG
+echo ""
+echo "Please update the CHANGELOG.md with release notes for v$NEW_VERSION"
+echo ""
+read -p "Open CHANGELOG.md in editor now? (yes/no): " EDIT
+if [ "$EDIT" = "yes" ]; then
+    ${EDITOR:-nano} "$CHANGELOG_FILE"
+fi
+
+echo ""
+echo "Ready to commit and tag the release."
+echo ""
+read -p "Create git commit and tag? (yes/no): " COMMIT
+if [ "$COMMIT" != "yes" ]; then
+    echo ""
+    echo "Release files updated but not committed."
+    echo "To commit manually:"
+    echo "  git add VERSION CHANGELOG.md"
+    echo "  git commit -m 'Release v$NEW_VERSION'"
+    echo "  git tag -a v$NEW_VERSION -m 'Version $NEW_VERSION'"
+    echo "  git push origin master --tags"
+    exit 0
+fi
+
+# Create git commit
+git add "$VERSION_FILE" "$CHANGELOG_FILE"
+git commit -m "Release v$NEW_VERSION"
+echo "✓ Created commit"
+
+# Create git tag
+git tag -a "v$NEW_VERSION" -m "Version $NEW_VERSION"
+echo "✓ Created tag v$NEW_VERSION"
+
+echo ""
+echo "=== Release v$NEW_VERSION Created Successfully! ==="
+echo ""
+echo "Next steps:"
+echo "  1. Review the commit: git show"
+echo "  2. Push to remote: git push origin master --tags"
+echo ""
+echo "To create a GitHub release:"
+echo "  gh release create v$NEW_VERSION --title \"Version $NEW_VERSION\" --notes-file CHANGELOG.md"
+echo ""
+
+cd "$ORIGINAL_DIR"

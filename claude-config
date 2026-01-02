@@ -7,6 +7,15 @@ set -e
 ORIGINAL_DIR="$(pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Load library for version function
+source "$SCRIPT_DIR/lib-claude-sync.sh"
+
+# Handle --version flag
+if [ "$1" = "--version" ] || [ "$1" = "-v" ]; then
+    show_version "$SCRIPT_DIR" "claude-config"
+    exit 0
+fi
+
 EXAMPLE_CONFIG="$SCRIPT_DIR/.claude-sync-config.example"
 LOCAL_CONFIG="$SCRIPT_DIR/.claude-sync-config.local"
 SHARED_CONFIG="$SCRIPT_DIR/.claude-sync-config"

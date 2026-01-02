@@ -297,6 +297,8 @@ See [SECURITY.md](SECURITY.md) for full security analysis and encryption guide.
 
 ## Commands Reference
 
+All commands support `--version` or `-v` to display version information.
+
 ### Setup Commands
 - `claude-config` - Interactive configuration wizard
 - `claude-sync-init` - Initialize/clone the conversations repository
@@ -426,13 +428,39 @@ sudo apt update
 sudo apt install git-crypt
 ```
 
+## Versioning
+
+This project uses [Semantic Versioning](https://semver.org/). Check the version of any command:
+
+```bash
+claude-sync-push --version
+claude-backup --version
+# etc.
+```
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
 ## Contributing
 
-Contributions welcome! Please:
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+Quick summary:
 - Follow existing code style
+- Add `--version` support to new commands
 - Update documentation
 - Test on fresh install
 - Ensure scripts return to original directory
+
+### For Maintainers
+
+Release process:
+```bash
+./claude-release patch  # or minor, major
+# Edit CHANGELOG.md with release notes
+# Push: git push origin master --tags
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full release documentation.
 
 ## License
 

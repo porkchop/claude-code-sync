@@ -9,6 +9,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Load configuration
 source "$SCRIPT_DIR/lib-claude-sync.sh"
+
+# Handle --version flag
+if [ "$1" = "--version" ] || [ "$1" = "-v" ]; then
+    show_version "$SCRIPT_DIR" "claude-backup-list"
+    exit 0
+fi
+
 load_config "$SCRIPT_DIR"
 
 BACKUP_DIR="$SCRIPT_DIR/backups"
