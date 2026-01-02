@@ -82,10 +82,11 @@ export PATH="$HOME/claude-code-sync:$PATH"
    ```
    Save the encryption key to your password manager (KeePass, 1Password, etc.)
 
-6. **Push your conversations**:
+6. **Exit Claude Code**, then push your conversations:
    ```bash
    claude-sync-push
    ```
+   > ⚠️ **Important:** Claude Code only writes conversations to disk when you exit. Always exit Claude Code before running `claude-sync-push` to ensure you're syncing the latest state.
 
 ### Setup on Additional Machines
 
@@ -124,10 +125,11 @@ export PATH="$HOME/claude-code-sync:$PATH"
    claude-sync-pull
    ```
 
-8. **Add this machine's conversations to the pool**:
+8. **Exit Claude Code** (if running), then add this machine's conversations:
    ```bash
    claude-sync-push
    ```
+   > ⚠️ **Important:** Always exit Claude Code before `claude-sync-push` to capture the latest conversation state.
 
 9. **Restart Claude Code** to see all synced conversations
 
@@ -136,12 +138,21 @@ export PATH="$HOME/claude-code-sync:$PATH"
 ### Before Starting Work
 ```bash
 claude-sync-pull
+# Then start Claude Code
 ```
 
 ### After Working / Before Switching Machines
 ```bash
+# Exit Claude Code first (important!)
 claude-sync-push
 ```
+
+> ⚠️ **Critical:** Claude Code only writes conversations to disk when you exit. Always:
+> 1. Exit Claude Code completely
+> 2. Run `claude-sync-push`
+> 3. Then switch machines or close your terminal
+>
+> If you run `claude-sync-push` while Claude Code is still running, you won't sync your latest work!
 
 ### Check Status
 ```bash
@@ -321,6 +332,14 @@ mv /home/user/old-name /home/user/new-name
 
 ## Troubleshooting
 
+### Latest changes not syncing
+**Problem:** You ran `claude-sync-push` but your latest conversation changes aren't showing up on other machines.
+
+**Solution:** Claude Code only writes conversations to disk when you exit. Always:
+1. Type `/exit` in Claude Code
+2. Wait for it to fully close
+3. Then run `claude-sync-push`
+
 ### "Repository not initialized" error
 - Run `claude-sync-init` before using `claude-sync-push` or `claude-sync-pull`
 
@@ -328,7 +347,7 @@ mv /home/user/old-name /home/user/new-name
 - Restore your encryption key: `claude-restore-encryption-key`
 - Then re-run `claude-sync-init` to unlock
 
-### Conversations not appearing
+### Conversations not appearing after sync
 - Restart Claude Code after `claude-sync-pull`
 - Check permissions: `ls -la ~/.claude/projects`
 
