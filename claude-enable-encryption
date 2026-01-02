@@ -12,7 +12,7 @@ KEY_PATH="$HOME/.claude-git-crypt.key"
 echo "=== Claude Code Conversation Encryption Setup ==="
 echo ""
 echo "This will enable transparent encryption for your synced conversations."
-echo "Files will be encrypted on Bitbucket, decrypted automatically on your machines."
+echo "Files will be encrypted on the remote, decrypted automatically on your machines."
 echo ""
 
 # Check if git-crypt is installed
@@ -32,7 +32,7 @@ REPO_DIR="$SCRIPT_DIR/conversations"
 # Check if conversations repo exists
 if [ ! -d "$REPO_DIR/.git" ]; then
     echo "Error: Conversations repository not initialized."
-    echo "Run 'claude-sync-push' first to initialize the repository."
+    echo "Run 'claude-sync-init' first to initialize the repository."
     cd "$ORIGINAL_DIR"
     exit 1
 fi

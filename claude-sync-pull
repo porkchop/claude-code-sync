@@ -1,6 +1,6 @@
 #!/bin/bash
-# Claude Code Conversation Sync - Pull from Bitbucket
-# Syncs conversations from this repo to ~/.claude
+# Claude Code Conversation Sync - Pull
+# Syncs conversations from remote repo to ~/.claude
 
 set -e
 

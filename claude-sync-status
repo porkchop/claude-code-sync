@@ -25,12 +25,12 @@ echo ""
 show_config
 echo ""
 
-# Check if git is initialized
-if [ -d "$SCRIPT_DIR/.git" ]; then
-    echo "Git repository: Initialized"
+# Check if conversations repo is initialized
+if [ -d "$REPO_DIR/.git" ]; then
+    echo "Conversations repository: Initialized"
 
     # Check for remote
-    cd "$SCRIPT_DIR"
+    cd "$REPO_DIR"
     if git remote | grep -q origin; then
         echo "Remote URL: $(git remote get-url origin)"
         echo "Current branch: $(git branch --show-current)"
@@ -39,6 +39,17 @@ if [ -d "$SCRIPT_DIR/.git" ]; then
         echo ""
         echo "To configure:"
         echo "  claude-config"
+    fi
+
+    # Check encryption status
+    if [ -d ".git/git-crypt" ]; then
+        if git-crypt status 2>/dev/null | grep -q "not decrypted"; then
+            echo "Encryption: Enabled (LOCKED - run claude-restore-encryption-key)"
+        else
+            echo "Encryption: Enabled (unlocked)"
+        fi
+    else
+        echo "Encryption: Not enabled"
     fi
 
     # Show git status
@@ -53,9 +64,10 @@ if [ -d "$SCRIPT_DIR/.git" ]; then
         echo ""
         echo "Run 'claude-sync-push' to sync these changes."
     fi
+    cd "$SCRIPT_DIR"
 else
-    echo "Git repository: Not initialized"
-    echo "Run 'claude-config' to set up, then 'claude-sync-push' to initialize."
+    echo "Conversations repository: Not initialized"
+    echo "Run 'claude-config' to set up, then 'claude-sync-init' to initialize."
 fi
 
 echo ""
@@ -78,6 +90,7 @@ fi
 echo ""
 echo "Commands:"
 echo "  claude-config      - Configure sync settings"
+echo "  claude-sync-init   - Initialize/clone conversations repository"
 echo "  claude-sync-push   - Sync local conversations to remote"
 echo "  claude-sync-pull   - Sync conversations from remote to local"
 echo "  claude-sync-status - Show this status"
