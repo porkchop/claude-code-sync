@@ -176,3 +176,100 @@ sync_jsonl_dir() {
         fi
     done
 }
+
+# Consolidate conversation files that share the same sessionId
+# Merges them into the canonical file (filename matches sessionId)
+# Usage: consolidate_sessions <projects_dir>
+consolidate_sessions() {
+    local projects_dir="$1"
+
+    if [ ! -d "$projects_dir" ]; then
+        return 0
+    fi
+
+    python3 << PYTHON_SCRIPT
+import os
+import json
+from collections import defaultdict
+from pathlib import Path
+
+projects_dir = Path("$projects_dir")
+consolidated_count = 0
+
+for project_dir in projects_dir.iterdir():
+    if not project_dir.is_dir():
+        continue
+
+    session_files = defaultdict(list)
+
+    for jsonl_file in project_dir.glob('*.jsonl'):
+        if jsonl_file.name.startswith('agent-'):
+            continue
+
+        try:
+            messages = []
+            session_id = None
+            with open(jsonl_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                        # Keep looking for sessionId until we find one
+                        if session_id is None and obj.get('sessionId'):
+                            session_id = obj.get('sessionId')
+                        messages.append(obj)
+                    except:
+                        continue
+
+            if session_id:
+                session_files[session_id].append((jsonl_file, messages))
+        except:
+            continue
+
+    for session_id, files_and_messages in session_files.items():
+        if len(files_and_messages) <= 1:
+            continue
+
+        canonical_file = None
+        canonical_messages = []
+        other_files = []
+
+        for filepath, messages in files_and_messages:
+            if filepath.stem == session_id:
+                canonical_file = filepath
+                canonical_messages = messages
+            else:
+                other_files.append((filepath, messages))
+
+        if not canonical_file:
+            canonical_file, canonical_messages = files_and_messages[0]
+            other_files = files_and_messages[1:]
+
+        if not other_files:
+            continue
+
+        all_messages = {json.dumps(m, sort_keys=True): m for m in canonical_messages}
+        for other_file, other_messages in other_files:
+            for msg in other_messages:
+                key = json.dumps(msg, sort_keys=True)
+                if key not in all_messages:
+                    all_messages[key] = msg
+
+        merged = list(all_messages.values())
+        merged.sort(key=lambda x: x.get('timestamp', ''))
+
+        with open(canonical_file, 'w') as f:
+            for msg in merged:
+                f.write(json.dumps(msg) + '\\n')
+
+        for other_file, _ in other_files:
+            other_file.unlink()
+
+        consolidated_count += 1
+
+if consolidated_count > 0:
+    print(f"  Consolidated {consolidated_count} session(s)")
+PYTHON_SCRIPT
+}

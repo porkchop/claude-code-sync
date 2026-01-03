@@ -73,6 +73,10 @@ if git remote | grep -q origin 2>/dev/null; then
     if [ -f "$REPO_DIR/history.jsonl" ]; then
         merge_jsonl "$CLAUDE_DIR/history.jsonl" "$REPO_DIR/history.jsonl" "$CLAUDE_DIR/history.jsonl"
     fi
+
+    # Consolidate sessions (merge files with same sessionId)
+    echo "Consolidating sessions..."
+    consolidate_sessions "$CLAUDE_DIR/projects"
     echo ""
 fi
 

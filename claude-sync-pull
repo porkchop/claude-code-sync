@@ -99,6 +99,10 @@ if [ -f "$REPO_DIR/history.jsonl" ]; then
     merge_jsonl "$CLAUDE_DIR/history.jsonl" "$REPO_DIR/history.jsonl" "$CLAUDE_DIR/history.jsonl"
 fi
 
+# Consolidate sessions (merge files with same sessionId)
+echo "Consolidating sessions..."
+consolidate_sessions "$CLAUDE_DIR/projects"
+
 # Set correct permissions
 chmod -R u+rwX,go-rwx "$CLAUDE_DIR/projects" 2>/dev/null || true
 chmod -R u+rwX,go-rwx "$CLAUDE_DIR/file-history" 2>/dev/null || true

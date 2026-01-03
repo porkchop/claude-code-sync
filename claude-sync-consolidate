@@ -1,0 +1,157 @@
+#!/bin/bash
+# Claude Code Conversation Sync - Consolidate Sessions
+# Merges conversation files that share the same sessionId into a single canonical file
+
+set -e
+
+ORIGINAL_DIR="$(pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load configuration
+source "$SCRIPT_DIR/lib-claude-sync.sh"
+
+# Handle --version flag
+if [ "$1" = "--version" ] || [ "$1" = "-v" ]; then
+    show_version "$SCRIPT_DIR" "claude-sync-consolidate"
+    exit 0
+fi
+
+load_config "$SCRIPT_DIR"
+
+CLAUDE_DIR="$CLAUDE_DATA_DIR"
+
+echo "=== Claude Code Conversation Sync - Consolidate Sessions ==="
+echo ""
+echo "This will merge conversation files that share the same sessionId."
+echo "Target: $CLAUDE_DIR/projects"
+echo ""
+
+# Check if projects directory exists
+if [ ! -d "$CLAUDE_DIR/projects" ]; then
+    echo "No projects directory found at $CLAUDE_DIR/projects"
+    cd "$ORIGINAL_DIR"
+    exit 0
+fi
+
+# Find and consolidate sessions
+python3 << 'PYTHON_SCRIPT'
+import os
+import sys
+import json
+from collections import defaultdict
+from pathlib import Path
+
+claude_dir = os.environ.get('CLAUDE_DATA_DIR', os.path.expanduser('~/.claude'))
+projects_dir = Path(claude_dir) / 'projects'
+
+if not projects_dir.exists():
+    print("No projects directory found")
+    sys.exit(0)
+
+# Track files by sessionId for each project
+consolidated_count = 0
+files_removed = 0
+
+for project_dir in projects_dir.iterdir():
+    if not project_dir.is_dir():
+        continue
+
+    # Group files by sessionId
+    session_files = defaultdict(list)  # sessionId -> [(filepath, messages)]
+
+    for jsonl_file in project_dir.glob('*.jsonl'):
+        # Skip agent files - they're subagent conversations
+        if jsonl_file.name.startswith('agent-'):
+            continue
+
+        try:
+            messages = []
+            session_id = None
+            with open(jsonl_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                        # Keep looking for sessionId until we find one
+                        if session_id is None and obj.get('sessionId'):
+                            session_id = obj.get('sessionId')
+                        messages.append(obj)
+                    except json.JSONDecodeError:
+                        continue
+
+            if session_id:
+                session_files[session_id].append((jsonl_file, messages))
+        except Exception as e:
+            print(f"  Warning: Could not read {jsonl_file.name}: {e}")
+            continue
+
+    # Consolidate sessions with multiple files
+    for session_id, files_and_messages in session_files.items():
+        if len(files_and_messages) <= 1:
+            continue
+
+        # Find canonical file (filename matches sessionId)
+        canonical_file = None
+        canonical_messages = []
+        other_files = []
+
+        for filepath, messages in files_and_messages:
+            if filepath.stem == session_id:
+                canonical_file = filepath
+                canonical_messages = messages
+            else:
+                other_files.append((filepath, messages))
+
+        if not canonical_file:
+            # No canonical file - use the first one as canonical
+            canonical_file, canonical_messages = files_and_messages[0]
+            other_files = files_and_messages[1:]
+
+        if not other_files:
+            continue
+
+        print(f"Consolidating session {session_id[:8]}... in {project_dir.name}")
+        print(f"  Canonical: {canonical_file.name}")
+
+        # Collect all messages from all files
+        all_messages = {json.dumps(m, sort_keys=True): m for m in canonical_messages}
+
+        for other_file, other_messages in other_files:
+            print(f"  Merging: {other_file.name} ({len(other_messages)} entries)")
+            for msg in other_messages:
+                key = json.dumps(msg, sort_keys=True)
+                if key not in all_messages:
+                    all_messages[key] = msg
+
+        # Sort by timestamp
+        merged = list(all_messages.values())
+        merged.sort(key=lambda x: x.get('timestamp', ''))
+
+        # Write consolidated file
+        with open(canonical_file, 'w') as f:
+            for msg in merged:
+                f.write(json.dumps(msg) + '\n')
+
+        print(f"  Result: {len(merged)} entries in {canonical_file.name}")
+
+        # Remove other files
+        for other_file, _ in other_files:
+            other_file.unlink()
+            print(f"  Removed: {other_file.name}")
+            files_removed += 1
+
+        consolidated_count += 1
+        print()
+
+if consolidated_count == 0:
+    print("No sessions needed consolidation.")
+else:
+    print(f"Consolidated {consolidated_count} session(s), removed {files_removed} duplicate file(s).")
+
+print()
+print("Done! Restart Claude Code to see the consolidated conversations.")
+PYTHON_SCRIPT
+
+cd "$ORIGINAL_DIR"
