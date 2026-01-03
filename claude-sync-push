@@ -70,22 +70,25 @@ mkdir -p "$REPO_DIR/projects"
 mkdir -p "$REPO_DIR/file-history"
 mkdir -p "$REPO_DIR/todos"
 
-# Sync projects (conversations) - MERGE, don't delete
-echo "Merging local conversations into repo..."
-rsync -av --update "$CLAUDE_DIR/projects/" "$REPO_DIR/projects/"
+# Smart merge for JSONL files (conversations) - combines entries from both versions
+echo "Merging conversations (smart JSONL merge)..."
+sync_jsonl_dir "$CLAUDE_DIR/projects" "$REPO_DIR/projects"
 
-# Sync file-history - MERGE, don't delete
+# Also copy any non-JSONL files with rsync
+rsync -av --update --include='*/' --include='*.json' --exclude='*.jsonl' "$CLAUDE_DIR/projects/" "$REPO_DIR/projects/" 2>/dev/null || true
+
+# Sync file-history - use rsync (not JSONL)
 echo "Merging file history..."
 rsync -av --update "$CLAUDE_DIR/file-history/" "$REPO_DIR/file-history/"
 
-# Sync todos - MERGE, don't delete
+# Sync todos - use rsync (not JSONL)
 echo "Merging todos..."
 rsync -av --update "$CLAUDE_DIR/todos/" "$REPO_DIR/todos/"
 
-# Sync global history
-echo "Syncing global history..."
+# Smart merge global history (JSONL file)
+echo "Merging global history..."
 if [ -f "$CLAUDE_DIR/history.jsonl" ]; then
-    cp "$CLAUDE_DIR/history.jsonl" "$REPO_DIR/history.jsonl"
+    merge_jsonl "$REPO_DIR/history.jsonl" "$CLAUDE_DIR/history.jsonl" "$REPO_DIR/history.jsonl"
 fi
 
 # Check if there are changes

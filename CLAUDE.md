@@ -62,9 +62,15 @@ This tool solves these problems by providing git-based sync with encryption supp
 
 **Sync Strategy:**
 1. `claude-sync-init` clones from remote (or initializes fresh if empty)
-2. `claude-sync-push` pulls latest first, then uses `rsync --update` to merge (newer files win, never delete)
-3. All machines accumulate conversations from all other machines
-4. Git commits track which machine contributed which conversations
+2. For JSONL files (conversations, history): smart merge combines all unique lines from both versions
+3. For other files: `rsync --update` (newer file wins by timestamp)
+4. All machines accumulate conversations from all other machines
+5. Git commits track which machine contributed which conversations
+
+**Smart JSONL Merge** (lib-claude-sync.sh):
+- `merge_jsonl` - combines two JSONL files, keeping all unique lines
+- `sync_jsonl_dir` - applies merge to all JSONL files in a directory
+- Prevents data loss when same conversation edited on multiple machines
 
 ### Design Decisions
 

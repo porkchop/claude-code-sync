@@ -68,39 +68,35 @@ cd "$SCRIPT_DIR"
 # Create Claude directory if it doesn't exist
 mkdir -p "$CLAUDE_DIR"
 
-# Sync with rsync (preserves newer files)
+# Smart merge conversations
 echo ""
 echo "Syncing conversations to $CLAUDE_DIR..."
 
-# Sync projects
+# Smart merge for JSONL files (conversations) - combines entries from both versions
 if [ -d "$REPO_DIR/projects" ]; then
-    echo "Syncing project conversations..."
-    rsync -av --update "$REPO_DIR/projects/" "$CLAUDE_DIR/projects/"
+    echo "Merging project conversations (smart JSONL merge)..."
+    sync_jsonl_dir "$REPO_DIR/projects" "$CLAUDE_DIR/projects"
+
+    # Also copy any non-JSONL files with rsync
+    rsync -av --update --include='*/' --include='*.json' --exclude='*.jsonl' "$REPO_DIR/projects/" "$CLAUDE_DIR/projects/" 2>/dev/null || true
 fi
 
-# Sync file-history
+# Sync file-history - use rsync (not JSONL)
 if [ -d "$REPO_DIR/file-history" ]; then
     echo "Syncing file history..."
     rsync -av --update "$REPO_DIR/file-history/" "$CLAUDE_DIR/file-history/"
 fi
 
-# Sync todos
+# Sync todos - use rsync (not JSONL)
 if [ -d "$REPO_DIR/todos" ]; then
     echo "Syncing todos..."
     rsync -av --update "$REPO_DIR/todos/" "$CLAUDE_DIR/todos/"
 fi
 
-# Sync global history (merge, don't overwrite)
+# Smart merge global history (JSONL file)
 if [ -f "$REPO_DIR/history.jsonl" ]; then
-    echo "Syncing global history..."
-    if [ -f "$CLAUDE_DIR/history.jsonl" ]; then
-        # Merge history files (keep both, sort by timestamp)
-        cat "$CLAUDE_DIR/history.jsonl" "$REPO_DIR/history.jsonl" | \
-            sort -u > "$CLAUDE_DIR/history.jsonl.tmp"
-        mv "$CLAUDE_DIR/history.jsonl.tmp" "$CLAUDE_DIR/history.jsonl"
-    else
-        cp "$REPO_DIR/history.jsonl" "$CLAUDE_DIR/history.jsonl"
-    fi
+    echo "Merging global history..."
+    merge_jsonl "$CLAUDE_DIR/history.jsonl" "$REPO_DIR/history.jsonl" "$CLAUDE_DIR/history.jsonl"
 fi
 
 # Set correct permissions

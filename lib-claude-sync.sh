@@ -82,3 +82,76 @@ show_version() {
         echo "$COMMAND_NAME version unknown (VERSION file not found)"
     fi
 }
+
+# Merge two JSONL files, keeping all unique lines from both
+# Usage: merge_jsonl <file1> <file2> <output>
+# If output is same as file1 or file2, uses temp file
+merge_jsonl() {
+    local file1="$1"
+    local file2="$2"
+    local output="$3"
+
+    # Handle missing files gracefully
+    if [ ! -f "$file1" ] && [ ! -f "$file2" ]; then
+        return 0
+    elif [ ! -f "$file1" ]; then
+        cp "$file2" "$output"
+        return 0
+    elif [ ! -f "$file2" ]; then
+        if [ "$file1" != "$output" ]; then
+            cp "$file1" "$output"
+        fi
+        return 0
+    fi
+
+    # Both files exist - merge them
+    local tmpfile=$(mktemp)
+
+    # Combine both files, sort, and remove exact duplicate lines
+    # Using sort -u for deduplication (works for identical JSON lines)
+    cat "$file1" "$file2" | sort -u > "$tmpfile"
+
+    mv "$tmpfile" "$output"
+    log_verbose "  Merged: $(wc -l < "$file1") + $(wc -l < "$file2") -> $(wc -l < "$output") lines"
+}
+
+# Smart sync for a directory of JSONL files
+# Merges each file instead of overwriting
+# Usage: sync_jsonl_dir <source_dir> <dest_dir>
+sync_jsonl_dir() {
+    local src_dir="$1"
+    local dest_dir="$2"
+
+    if [ ! -d "$src_dir" ]; then
+        return 0
+    fi
+
+    mkdir -p "$dest_dir"
+
+    # Process each file in source
+    find "$src_dir" -type f -name "*.jsonl" | while read src_file; do
+        local relpath="${src_file#$src_dir/}"
+        local dest_file="$dest_dir/$relpath"
+        local dest_subdir=$(dirname "$dest_file")
+
+        mkdir -p "$dest_subdir"
+
+        if [ -f "$dest_file" ]; then
+            # Both exist - merge
+            merge_jsonl "$dest_file" "$src_file" "$dest_file"
+        else
+            # Only source exists - copy
+            cp "$src_file" "$dest_file"
+        fi
+    done
+
+    # Also copy any files from dest that don't exist in source (preserve remote-only files)
+    find "$dest_dir" -type f -name "*.jsonl" | while read dest_file; do
+        local relpath="${dest_file#$dest_dir/}"
+        local src_file="$src_dir/$relpath"
+
+        if [ ! -f "$src_file" ]; then
+            log_verbose "  Keeping remote-only: $relpath"
+        fi
+    done
+}
