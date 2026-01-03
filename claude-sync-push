@@ -63,6 +63,17 @@ if git remote | grep -q origin 2>/dev/null; then
         echo "Note: Could not pull. Continuing with local merge..."
     }
     echo ""
+
+    # Sync any new conversations from remote to local
+    echo "Syncing remote conversations to local..."
+    sync_jsonl_dir "$REPO_DIR/projects" "$CLAUDE_DIR/projects"
+    rsync -av --update --include='*/' --include='*.json' --exclude='*.jsonl' "$REPO_DIR/projects/" "$CLAUDE_DIR/projects/" 2>/dev/null || true
+    rsync -av --update "$REPO_DIR/file-history/" "$CLAUDE_DIR/file-history/" 2>/dev/null || true
+    rsync -av --update "$REPO_DIR/todos/" "$CLAUDE_DIR/todos/" 2>/dev/null || true
+    if [ -f "$REPO_DIR/history.jsonl" ]; then
+        merge_jsonl "$CLAUDE_DIR/history.jsonl" "$REPO_DIR/history.jsonl" "$CLAUDE_DIR/history.jsonl"
+    fi
+    echo ""
 fi
 
 # Create directory structure
