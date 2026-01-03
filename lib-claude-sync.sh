@@ -85,7 +85,7 @@ show_version() {
 
 # Merge two JSONL files, keeping all unique lines from both
 # Usage: merge_jsonl <file1> <file2> <output>
-# If output is same as file1 or file2, uses temp file
+# Deduplicates and sorts by timestamp to maintain conversation order
 merge_jsonl() {
     local file1="$1"
     local file2="$2"
@@ -107,9 +107,30 @@ merge_jsonl() {
     # Both files exist - merge them
     local tmpfile=$(mktemp)
 
-    # Combine both files, sort, and remove exact duplicate lines
-    # Using sort -u for deduplication (works for identical JSON lines)
-    cat "$file1" "$file2" | sort -u > "$tmpfile"
+    # Combine both files, deduplicate, and sort by timestamp
+    # Uses Python for reliable JSON parsing and timestamp sorting
+    cat "$file1" "$file2" | python3 -c "
+import sys, json
+
+seen = set()
+lines = []
+for line in sys.stdin:
+    line = line.strip()
+    if not line or line in seen:
+        continue
+    seen.add(line)
+    try:
+        obj = json.loads(line)
+        ts = obj.get('timestamp', '')
+        lines.append((ts, line))
+    except:
+        lines.append(('', line))
+
+# Sort by timestamp
+lines.sort(key=lambda x: x[0])
+for ts, line in lines:
+    print(line)
+" > "$tmpfile"
 
     mv "$tmpfile" "$output"
     log_verbose "  Merged: $(wc -l < "$file1") + $(wc -l < "$file2") -> $(wc -l < "$output") lines"
