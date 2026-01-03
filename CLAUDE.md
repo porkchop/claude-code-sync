@@ -19,11 +19,13 @@ This tool solves these problems by providing git-based sync with encryption supp
 ### Core Components
 
 **Configuration System** (`lib-claude-sync.sh`)
-- Three-layer configuration: env vars > local config > shared config
+- Two-layer configuration: env vars > local config
+- Defaults hardcoded in `load_config()`, overridable via `.claude-sync-config.local`
 - Validates required settings before operations
-- Provides helpful error messages
+- `show_version()` function reads from VERSION file
 
 **Sync Scripts**
+- `claude-sync-init` - Clones conversations repo from remote, handles encryption unlock
 - `claude-sync-push` - Merges local conversations to git remote
 - `claude-sync-pull` - Pulls and merges remote conversations locally
 - `claude-sync-status` - Shows configuration and sync state
@@ -41,9 +43,12 @@ This tool solves these problems by providing git-based sync with encryption supp
 
 **Configuration**
 - `claude-config` - Interactive wizard for first-time setup
-- `.claude-sync-config` - Shared defaults (committed)
-- `.claude-sync-config.local` - Machine-specific (gitignored)
+- `.claude-sync-config.local` - Machine-specific settings (gitignored)
 - `.claude-sync-config.example` - Template with full documentation
+
+**Release Management**
+- `claude-release` - Bumps version (patch/minor/major), updates VERSION and CHANGELOG.md
+- `VERSION` - Single source of truth for version number
 
 ### Data Flow
 
@@ -56,8 +61,8 @@ This tool solves these problems by providing git-based sync with encryption supp
 ```
 
 **Sync Strategy:**
-1. `claude-sync-push` pulls latest from remote first (avoid conflicts)
-2. Uses `rsync --update` to merge (newer files win, never delete)
+1. `claude-sync-init` clones from remote (or initializes fresh if empty)
+2. `claude-sync-push` pulls latest first, then uses `rsync --update` to merge (newer files win, never delete)
 3. All machines accumulate conversations from all other machines
 4. Git commits track which machine contributed which conversations
 
@@ -72,7 +77,6 @@ This tool solves these problems by providing git-based sync with encryption supp
 - Transparent encryption (files encrypted on remote, decrypted locally)
 - No workflow changes after initial setup
 - Standard tool, widely trusted
-- Better than manual GPG encryption
 
 **Why local backups?**
 - Safety net before first sync attempt
@@ -80,22 +84,22 @@ This tool solves these problems by providing git-based sync with encryption supp
 - Not synced to remote (local only)
 - Configurable retention policy
 
-**Why three-layer config?**
+**Why two-layer config?**
 - Environment variables for temporary testing/overrides
 - Local config for machine-specific settings (gitignored)
-- Shared config for team/project defaults (version controlled)
-- Standard Unix pattern, familiar to users
+- Defaults in `lib-claude-sync.sh` ensure scripts work out of the box
 
 ## Development Guidelines
 
-### Adding New Features
+### Adding New Commands
 
 When adding new commands:
 1. Source `lib-claude-sync.sh` for configuration
-2. Save/restore `ORIGINAL_DIR` (return user to starting directory)
-3. Use `$CLAUDE_DATA_DIR` not hardcoded `~/.claude`
-4. Add to README.md and update CLAUDE.md
+2. Add `--version` flag handling using `show_version "$SCRIPT_DIR" "command-name"`
+3. Save/restore `ORIGINAL_DIR` (return user to starting directory)
+4. Use `$CLAUDE_DATA_DIR` not hardcoded `~/.claude`
 5. Make executable with `chmod +x`
+6. Update README.md Commands Reference section
 
 ### Configuration Variables
 
@@ -107,11 +111,18 @@ Always use these variables from config:
 - `$CLAUDE_BACKUP_RETENTION_DAYS` - Backup retention
 - `$CLAUDE_SYNC_VERBOSE` - Verbose output
 
+### Adding a New Configuration Option
+
+1. Add default to `load_config()` in `lib-claude-sync.sh`
+2. Add to `.claude-sync-config.example` with documentation
+3. Update `show_config()` to display it
+4. Update `claude-config` wizard if user-facing
+5. Document in CONFIGURATION.md and README.md
+
 ### Error Handling
 
 - Use `set -e` for automatic error handling
 - Validate config with `validate_config` before operations
-- Provide helpful error messages with next steps
 - Return to original directory on all exit paths
 
 ### Testing
@@ -122,18 +133,7 @@ Test on multiple machines:
 - After encryption enabled
 - With non-standard CLAUDE_DATA_DIR
 
-## Common Development Tasks
-
-### Adding a New Configuration Option
-
-1. Add to `.claude-sync-config.example` with documentation
-2. Add to `.claude-sync-config` with default value
-3. Update `load_config()` in `lib-claude-sync.sh`
-4. Update `show_config()` to display it
-5. Update `claude-config` wizard if user-facing
-6. Document in CONFIGURATION.md
-
-### Debugging Configuration Issues
+### Debugging
 
 ```bash
 # See what config is active
@@ -146,17 +146,6 @@ CLAUDE_SYNC_VERBOSE="true" claude-sync-push
 bash -x ./claude-sync-push 2>&1 | grep -A5 "load_config"
 ```
 
-### Supporting New Git Providers
-
-The tool is provider-agnostic. It works with:
-- GitHub
-- Bitbucket
-- GitLab
-- Gitea
-- Any git remote
-
-No code changes needed - users just set `CLAUDE_SYNC_REMOTE`.
-
 ## Project Standards
 
 ### File Naming
@@ -165,15 +154,9 @@ No code changes needed - users just set `CLAUDE_SYNC_REMOTE`.
 - Docs: `*.md` (uppercase for top-level docs)
 - Library: `lib-claude-sync.sh`
 
-### Documentation
-- README.md - User-facing quick start and usage
-- CLAUDE.md - This file, for development context
-- SECURITY.md - Security analysis and encryption guide
-- CONFIGURATION.md - Detailed configuration reference
-
 ### Git Commit Style
 
-Follow existing pattern:
+For sync commits (automated):
 ```
 Sync conversations - YYYY-MM-DD HH:MM:SS - hostname
 ```
@@ -185,29 +168,12 @@ fix: correct tar exclusion for custom data dir
 docs: update configuration examples
 ```
 
-## Future Enhancements (Ideas)
+### Releasing New Versions
 
-- Web UI for browsing synced conversations
-- Selective sync (choose which projects to sync)
-- Conflict resolution UI for same conversation modified on multiple machines
-- Export conversations to markdown/PDF
-- Search across all synced conversations
-- Support for Windows (PowerShell version)
-- Homebrew formula for macOS
-- Pre-commit hooks for validation
-- CI/CD for testing across different environments
+```bash
+./claude-release patch  # or minor, major
+# Edit CHANGELOG.md with release notes
+git push origin master --tags
+```
 
-## Support and Contributions
-
-When reviewing PRs:
-- Ensure scripts return to original directory
-- Check that configuration system is used properly
-- Verify error messages are helpful
-- Test on fresh install
-- Update relevant documentation
-
-For issues:
-- Ask for `claude-sync-status` output
-- Ask for OS/shell version
-- Check for configuration issues first
-- Look for permission problems with ~/.claude
+See CONTRIBUTING.md for full release process.

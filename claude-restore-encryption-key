@@ -19,6 +19,19 @@ fi
 
 KEY_PATH="$HOME/.claude-git-crypt.key"
 
+# Check if git-crypt is installed
+if ! command -v git-crypt &> /dev/null; then
+    echo "Error: git-crypt is not installed."
+    echo ""
+    echo "Install it with:"
+    echo "  sudo apt install git-crypt     (Ubuntu/Debian)"
+    echo "  sudo dnf install git-crypt     (Fedora)"
+    echo "  brew install git-crypt         (macOS)"
+    echo ""
+    cd "$ORIGINAL_DIR"
+    exit 1
+fi
+
 echo "=== Restore Git-Crypt Key from KeePass ==="
 echo ""
 echo "This will help you restore your encryption key from KeePass."
