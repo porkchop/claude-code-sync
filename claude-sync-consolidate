@@ -115,24 +115,52 @@ for project_dir in projects_dir.iterdir():
         print(f"Consolidating session {session_id[:8]}... in {project_dir.name}")
         print(f"  Canonical: {canonical_file.name}")
 
-        # Collect all messages from all files
-        all_messages = {json.dumps(m, sort_keys=True): m for m in canonical_messages}
+        # UUID-based smart merge
+        uuid_entries = {}  # uuid -> (entry, timestamp)
+        non_uuid_entries = {}  # content_hash -> (entry, timestamp)
 
+        # Process all messages from all files
+        all_source_messages = list(canonical_messages)
         for other_file, other_messages in other_files:
             print(f"  Merging: {other_file.name} ({len(other_messages)} entries)")
-            for msg in other_messages:
-                key = json.dumps(msg, sort_keys=True)
-                if key not in all_messages:
-                    all_messages[key] = msg
+            all_source_messages.extend(other_messages)
+
+        for entry in all_source_messages:
+            uuid = entry.get('uuid')
+            timestamp = entry.get('timestamp', '')
+
+            if uuid:
+                # UUID-based deduplication: keep entry with newer timestamp
+                if uuid in uuid_entries:
+                    existing_entry, existing_ts = uuid_entries[uuid]
+                    if timestamp > existing_ts:
+                        uuid_entries[uuid] = (entry, timestamp)
+                else:
+                    uuid_entries[uuid] = (entry, timestamp)
+            else:
+                # Non-UUID entries: deduplicate by normalized JSON content
+                content_key = json.dumps(entry, sort_keys=True)
+                if content_key not in non_uuid_entries:
+                    non_uuid_entries[content_key] = (entry, timestamp)
+                else:
+                    _, existing_ts = non_uuid_entries[content_key]
+                    if timestamp > existing_ts:
+                        non_uuid_entries[content_key] = (entry, timestamp)
+
+        # Combine all entries
+        merged = []
+        for entry, ts in uuid_entries.values():
+            merged.append(entry)
+        for entry, ts in non_uuid_entries.values():
+            merged.append(entry)
 
         # Sort by timestamp
-        merged = list(all_messages.values())
         merged.sort(key=lambda x: x.get('timestamp', ''))
 
         # Write consolidated file
         with open(canonical_file, 'w') as f:
             for msg in merged:
-                f.write(json.dumps(msg) + '\n')
+                f.write(json.dumps(msg, separators=(',', ':')) + '\n')
 
         print(f"  Result: {len(merged)} entries in {canonical_file.name}")
 

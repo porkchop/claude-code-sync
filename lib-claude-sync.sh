@@ -83,9 +83,13 @@ show_version() {
     fi
 }
 
-# Merge two JSONL files, keeping all unique lines from both
+# Merge two JSONL files using UUID-based smart merge
 # Usage: merge_jsonl <file1> <file2> <output>
-# Deduplicates and sorts by timestamp to maintain conversation order
+#
+# Smart merge strategy (inspired by claude-code-sync Rust implementation):
+# 1. For entries with UUIDs: merge by UUID, keep newer timestamp if edited
+# 2. For entries without UUIDs: deduplicate by content hash
+# 3. Sort final result by timestamp to maintain conversation order
 merge_jsonl() {
     local file1="$1"
     local file2="$2"
@@ -104,32 +108,66 @@ merge_jsonl() {
         return 0
     fi
 
-    # Both files exist - merge them
+    # Both files exist - smart merge them
     local tmpfile=$(mktemp)
 
-    # Combine both files, deduplicate, and sort by timestamp
-    # Uses Python for reliable JSON parsing and timestamp sorting
+    # UUID-based smart merge using Python
     cat "$file1" "$file2" | python3 -c "
-import sys, json
+import sys
+import json
 
-seen = set()
-lines = []
+# Separate entries by whether they have UUIDs
+uuid_entries = {}  # uuid -> (entry, timestamp)
+non_uuid_entries = {}  # content_hash -> (entry, timestamp)
+
 for line in sys.stdin:
     line = line.strip()
-    if not line or line in seen:
+    if not line:
         continue
-    seen.add(line)
+
     try:
-        obj = json.loads(line)
-        ts = obj.get('timestamp', '')
-        lines.append((ts, line))
-    except:
-        lines.append(('', line))
+        entry = json.loads(line)
+    except json.JSONDecodeError:
+        continue
+
+    uuid = entry.get('uuid')
+    timestamp = entry.get('timestamp', '')
+
+    if uuid:
+        # UUID-based deduplication: keep entry with newer timestamp
+        if uuid in uuid_entries:
+            existing_entry, existing_ts = uuid_entries[uuid]
+            # Keep the one with newer timestamp
+            if timestamp > existing_ts:
+                uuid_entries[uuid] = (entry, timestamp)
+            # If timestamps equal, entries might be identical - keep existing
+        else:
+            uuid_entries[uuid] = (entry, timestamp)
+    else:
+        # Non-UUID entries: deduplicate by normalized JSON content
+        # Sort keys to normalize JSON representation
+        content_key = json.dumps(entry, sort_keys=True)
+        if content_key not in non_uuid_entries:
+            non_uuid_entries[content_key] = (entry, timestamp)
+        else:
+            # Keep entry with newer timestamp
+            _, existing_ts = non_uuid_entries[content_key]
+            if timestamp > existing_ts:
+                non_uuid_entries[content_key] = (entry, timestamp)
+
+# Combine all entries
+all_entries = []
+for entry, ts in uuid_entries.values():
+    all_entries.append((ts, entry))
+for entry, ts in non_uuid_entries.values():
+    all_entries.append((ts, entry))
 
 # Sort by timestamp
-lines.sort(key=lambda x: x[0])
-for ts, line in lines:
-    print(line)
+all_entries.sort(key=lambda x: x[0])
+
+# Output merged entries
+for ts, entry in all_entries:
+    print(json.dumps(entry, separators=(',', ':')))
 " > "$tmpfile"
 
     mv "$tmpfile" "$output"
@@ -179,6 +217,7 @@ sync_jsonl_dir() {
 
 # Consolidate conversation files that share the same sessionId
 # Merges them into the canonical file (filename matches sessionId)
+# Uses UUID-based smart merge to properly handle entries from different machines
 # Usage: consolidate_sessions <projects_dir>
 consolidate_sessions() {
     local projects_dir="$1"
@@ -250,19 +289,50 @@ for project_dir in projects_dir.iterdir():
         if not other_files:
             continue
 
-        all_messages = {json.dumps(m, sort_keys=True): m for m in canonical_messages}
-        for other_file, other_messages in other_files:
-            for msg in other_messages:
-                key = json.dumps(msg, sort_keys=True)
-                if key not in all_messages:
-                    all_messages[key] = msg
+        # UUID-based smart merge (like merge_jsonl)
+        uuid_entries = {}  # uuid -> (entry, timestamp)
+        non_uuid_entries = {}  # content_hash -> (entry, timestamp)
 
-        merged = list(all_messages.values())
+        # Process all messages from all files
+        all_source_messages = list(canonical_messages)
+        for other_file, other_messages in other_files:
+            all_source_messages.extend(other_messages)
+
+        for entry in all_source_messages:
+            uuid = entry.get('uuid')
+            timestamp = entry.get('timestamp', '')
+
+            if uuid:
+                # UUID-based deduplication: keep entry with newer timestamp
+                if uuid in uuid_entries:
+                    existing_entry, existing_ts = uuid_entries[uuid]
+                    if timestamp > existing_ts:
+                        uuid_entries[uuid] = (entry, timestamp)
+                else:
+                    uuid_entries[uuid] = (entry, timestamp)
+            else:
+                # Non-UUID entries: deduplicate by normalized JSON content
+                content_key = json.dumps(entry, sort_keys=True)
+                if content_key not in non_uuid_entries:
+                    non_uuid_entries[content_key] = (entry, timestamp)
+                else:
+                    _, existing_ts = non_uuid_entries[content_key]
+                    if timestamp > existing_ts:
+                        non_uuid_entries[content_key] = (entry, timestamp)
+
+        # Combine all entries
+        merged = []
+        for entry, ts in uuid_entries.values():
+            merged.append(entry)
+        for entry, ts in non_uuid_entries.values():
+            merged.append(entry)
+
+        # Sort by timestamp
         merged.sort(key=lambda x: x.get('timestamp', ''))
 
         with open(canonical_file, 'w') as f:
             for msg in merged:
-                f.write(json.dumps(msg) + '\\n')
+                f.write(json.dumps(msg, separators=(',', ':')) + '\\n')
 
         for other_file, _ in other_files:
             other_file.unlink()
