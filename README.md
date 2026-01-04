@@ -366,6 +366,7 @@ mv /home/user/old-name /home/user/new-name
 ### Core Dependencies
 - Bash 4.0+
 - Git
+- Python 3.6+ (for smart JSONL merge and session consolidation)
 - rsync
 - tar, gzip
 - git-crypt (optional, for encryption)

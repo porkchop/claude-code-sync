@@ -242,9 +242,6 @@ for project_dir in projects_dir.iterdir():
     session_files = defaultdict(list)
 
     for jsonl_file in project_dir.glob('*.jsonl'):
-        if jsonl_file.name.startswith('agent-'):
-            continue
-
         try:
             messages = []
             session_id = None
